@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: #f5f5dc;
+    font-family: 'Playfair Display', 'Georgia', serif;
+    box-sizing: border-box;
+}
+        
+        /* Add transition overlay */
+        .page-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #dedede;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 9999;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f5dc;
+            font-family: 'Playfair Display', 'Georgia', serif;
+            min-height: 100vh;
+        }
+header {
+    text-align: center;
+    margin-top: 48px;
+    background: transparent;
+    width: 100vw;
+    padding: 0;
+}
+        .logo-text {
+            font-family: 'Cinzel', serif;
+            font-size: 2.7rem;
+            color: #1a2b1a;
+            letter-spacing: 2px;
+            font-variant: small-caps;
+            text-transform: uppercase;
+        }
+        .logo-text sup {
+            font-size: 1.2rem;
+            font-family: Arial, sans-serif;
+            color: #222;
+            font-weight: 400;
+            letter-spacing: 0;
+        }
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 80vh;
+        }
+        .signup-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.2rem;
+            font-weight: 400;
+            margin: 24px 0 18px 0;
+            color: #111;
+            letter-spacing: 0.5px;
+        }
+        .signup-form-container {
+            background: #f6f6f6;
+            border-radius: 32px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.03);
+            padding: 36px 36px 24px 36px;
+            width: 480px;
+            max-width: 95vw;
+            margin-bottom: 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        form {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+        .form-row input {
+            flex: 1;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 18px;
+            border: none;
+            border-radius: 12px;
+            background: #e3e3e3;
+            font-size: 1.1rem;
+            font-family: 'Playfair Display', serif;
+            color: #222;
+            margin-bottom: 0;
+            outline: none;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="password"]:focus {
+            background: #eaeaea;
+        }
+        .role-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 0;
+        }
+        .role-label {
+            font-size: 1.05rem;
+            color: #222;
+            font-family: 'Playfair Display', serif;
+            margin-right: 8px;
+        }
+        .role-options {
+            display: flex;
+            gap: 8px;
+        }
+        .role-radio {
+            display: none;
+        }
+        .role-btn {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 16px;
+            padding: 4px 18px;
+            font-size: 1rem;
+            font-family: 'Playfair Display', serif;
+            color: #222;
+            cursor: pointer;
+            transition: background 0.2s, border 0.2s;
+        }
+        .role-radio:checked + .role-btn {
+            background: #e3e3e3;
+            border: 1.5px solid #ff4d00;
+            color: #ff4d00;
+        }
+        .signup-btn {
+            background: #ff4d00;
+            color: #fff;
+            border: none;
+            border-radius: 2rem;
+            padding: 0.8rem 0;
+            font-size: 1.5rem;
+            font-family: 'Playfair Display', serif;
+            cursor: pointer;
+            margin-top: 18px;
+            margin-bottom: 0;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        .signup-btn:hover {
+            background: #d13c00;
+        }
+        .terms, .note {
+            font-size: 0.95rem;
+            color: #888;
+            margin: 8px 0 0 0;
+            text-align: center;
+        }
+        .terms a {
+            color: #ff4d00;
+            text-decoration: none;
+        }
+        .note {
+            font-size: 0.9rem;
+            color: #b44;
+        }
+        .divider-line {
+            width: 520px;
+            max-width: 90vw;
+            height: 1px;
+            background: #bbb;
+            margin: 32px auto 0 auto;
+        }
+        .continue-label {
+            text-align: center;
+            margin: 18px 0 18px 0;
+            font-size: 1.1rem;
+            color: #444;
+            font-family: 'Playfair Display', serif;
+        }
+        .social-btns {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 0;
+        }
+        .social-btn {
+            background: #fff;
+            color: #222;
+            border: none;
+            border-radius: 18px;
+            padding: 10px 28px;
+            font-size: 1.25rem;
+            font-family: 'Playfair Display', serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .social-btn:hover {
+            background: #f3f3f3;
+            color: #ff4d00;
+        }
+        footer {
+            text-align: center;
+            margin-top: 32px;
+            color: #222;
+            font-size: 1rem;
+            font-family: 'Playfair Display', serif;
+        }
+        @media (max-width: 600px) {
+            .signup-form-container, .divider-line {
+                width: 98vw;
+                padding: 12px;
+            }
+            .divider-line {
+                width: 98vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-transition"></div>
+    <button id="backHomeBtn" type="button" aria-label="Back to Home" style="position: absolute; top: 24px; left: 24px; background: transparent; border: none; cursor: pointer; z-index: 100; padding: 0;">
+        <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="19" cy="19" r="19" fill="#f5f5dc" stroke="#ccc" stroke-width="1.5"/>
+            <path d="M22 13L16 19L22 25" stroke="#ff4d00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+    <header>
+        <div class="logo-text">RTS</div>
+    </header>
+    <main>
+        <div class="signup-title">Sign Up</div>
+        <div class="signup-form-container">
+            <form action="/register" method="POST">
+                <div class="form-row">
+                    <input type="text" name="firstName" placeholder="First Name*" required>
+                    <input type="text" name="lastName" placeholder="Last Name*" required>
+                </div>
+                <input type="email" name="email" placeholder="Email*" required>
+                <input type="text" name="Company" placeholder="Company Name (only for employees&HR)" required for employee>
+                <input type="text" name="username" placeholder="Username*" required>
+                <input type="password" name="password" placeholder="Password*" required>
+                <input type="password" name="confirmPassword" placeholder="Confirm Password*" required>
+                <div class="role-group">
+                    <span class="role-label">Role*:</span>
+                    <div class="role-options">
+                        <input type="radio" id="role-admin" name="Role" value="admin" class="role-radio" required>
+                        <label for="role-admin" class="role-btn">Admin</label>
+                        <input type="radio" id="role-consumer" name="Role" value="consumer" class="role-radio">
+                        <label for="role-consumer" class="role-btn">Consumer</label>
+                    </div>
+                </div>
+                <button type="submit" class="signup-btn">Continue</button>
+                <p class="terms">By signing up, you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a>.</p>
+                <p class="note">* All fields are mandatory.</p>
+            </form>
+        </div>
+        <div class="divider-line"></div>
+        <div class="continue-label">Or Continue with:</div>
+        <div class="social-btns">
+            <button class="social-btn">Continue with Google</button>
+            <button class="social-btn">Continue with Microsoft</button>
+            <button class="social-btn">Continue with Apple</button>
+        </div>
+        <footer>
+            <p>Already have an account? <a href="login.html">Login here</a>.</p>
+        </footer>
+    </main>
+    <div class="page-transition"></div>
+    <script>
+        function handlePageTransition(targetUrl) {
+            const overlay = document.querySelector('.page-transition');
+            overlay.style.opacity = '1';
+            
+            setTimeout(() => {
+                window.location.href = targetUrl;
+            }, 300);
+        }
+
+        // Add transitions to all links and buttons
+        document.querySelectorAll('a, button[onclick]').forEach(element => {
+            if (element.hasAttribute('onclick')) {
+                const url = element.getAttribute('onclick').replace("window.location.href='", '').replace("'", '');
+                element.removeAttribute('onclick');
+                element.addEventListener('click', () => handlePageTransition(url));
+            } else if (element.href && !element.href.includes('javascript:')) {
+                const url = element.href;
+                element.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    handlePageTransition(url);
+                });
+            }
+        });
+
+        // Back arrow event
+        document.getElementById('backHomeBtn').addEventListener('click', function() {
+            handlePageTransition('home.html');
+        });
+
+        // Add fade-in effect when page loads
+        window.addEventListener('load', () => {
+            document.body.style.opacity = '0';
+            setTimeout(() => {
+                document.body.style.transition = 'opacity 0.3s ease';
+                document.body.style.opacity = '1';
+            }, 0);
+        });
+    </script>
+</body>
+</html>
