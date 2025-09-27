@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Dashboard - Transport Services</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: #dedede;
+            font-family: 'Cinzel', 'Georgia', serif;
+            box-sizing: border-box;
+        }
+        .navbar {
+            background: #dedede;
+            color: #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 40px;
+            height: 80px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+            border-bottom: 2px solid #bbb;
+            transition: box-shadow 0.3s, transform 0.3s, background 0.3s;
+        }
+        .navbar-content {
+            width: 100%;
+            max-width: 1400px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 0 auto;
+        }
+        .navbar .logo {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .navbar .logo img {
+            height: 48px;
+            margin-right: 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+        }
+        .navbar .logo span {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #222;
+            text-shadow: 1px 1px 4px #dedede44;
+            font-family: 'Cinzel', serif;
+        }
+        .navbar nav {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            flex: 1;
+        }
+        .navbar nav a {
+            color: #000;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 10px 22px;
+            border-radius: 6px;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+            box-shadow: none;
+            background: none;
+        }
+        .navbar nav a:hover {
+            background: #fff;
+            color: #ff4d00;
+            box-shadow: 0 2px 8px rgba(255,152,0,0.10);
+        }
+        .navbar nav a.active {
+            color: #000;
+            background: none;
+            box-shadow: none;
+        }
+        .navbar .actions {
+            display: flex;
+            gap: 18px;
+        }
+        .navbar .actions a {
+            background: #ff4d00;
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            box-shadow: 0 2px 8px rgba(255,77,0,0.12);
+            border: none;
+            transition: background 0.2s, color 0.2s;
+        }
+        .navbar .actions a:hover {
+            background: #d13c00;
+            color: #fff;
+        }
+        .dashboard-container {
+            max-width: 1300px;
+            margin: 110px auto 40px auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 32px 40px;
+            animation: fadeIn 1s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .dashboard-header {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #0d3c6e;
+            margin-bottom: 18px;
+            text-align: center;
+        }
+        .dashboard-sections {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 32px;
+        }
+        .main-section {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+        .side-section {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+        .card {
+            background: #f4f6fb;
+            border-radius: 8px;
+            padding: 24px 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: box-shadow 0.3s, transform 0.3s;
+        }
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            transform: translateY(-4px) scale(1.02);
+        }
+        .card-title {
+            font-size: 1.3rem;
+            color: #0d3c6e;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .live-map {
+            width: 100%;
+            height: 250px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #e3eafc 60%, #b6d0f7 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0d3c6e;
+            font-size: 1.1rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-bar {
+            width: 100%;
+            background: #e0e0e0;
+            border-radius: 6px;
+            margin: 18px 0 0 0;
+            height: 18px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, #0d3c6e 60%, #ff9800 100%);
+            width: 70%;
+            border-radius: 6px;
+            transition: width 1s;
+        }
+        .eta {
+            margin-top: 8px;
+            color: #ff9800;
+            font-weight: 700;
+        }
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .orders-table th, .orders-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #dbe2ef;
+            text-align: left;
+        }
+        .orders-table th {
+            background: #e3eafc;
+            color: #0d3c6e;
+        }
+        .orders-table tr:hover {
+            background: #f9fafc;
+            transition: background 0.2s;
+        }
+        .filter-bar {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 12px;
+        }
+        .filter-bar input, .filter-bar select {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #b6d0f7;
+            font-size: 1rem;
+        }
+        .cost-cards {
+            display: flex;
+            gap: 18px;
+        }
+        .cost-card {
+            flex: 1;
+            background: #fff3e0;
+            border-radius: 8px;
+            padding: 18px 20px;
+            box-shadow: 0 2px 8px rgba(255,152,0,0.08);
+            text-align: center;
+            transition: box-shadow 0.3s, transform 0.3s;
+        }
+        .cost-card:hover {
+            box-shadow: 0 8px 24px rgba(255,152,0,0.18);
+            transform: scale(1.04);
+        }
+        .cost-label {
+            color: #0d3c6e;
+            font-size: 1rem;
+        }
+        .cost-value {
+            color: #ff9800;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+        .quick-pay {
+            display: inline-block;
+            background: #ff9800;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 8px;
+            transition: background 0.2s;
+        }
+        .quick-pay:hover {
+            background: #e67c00;
+        }
+        .notifications-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .notifications-list li {
+            background: #e3eafc;
+            color: #0d3c6e;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            transition: background 0.2s;
+        }
+        .notifications-list li.important {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        .rate-calc-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .rate-calc-form input, .rate-calc-form select {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #b6d0f7;
+            font-size: 1rem;
+        }
+        .rate-calc-form button {
+            background: #0d3c6e;
+            color: #fff;
+            border: none;
+            padding: 10px 0;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .rate-calc-form button:hover {
+            background: #ff9800;
+        }
+        .rate-result {
+            margin-top: 10px;
+            color: #ff9800;
+            font-weight: 700;
+        }
+        .support-section {
+            display: flex;
+            gap: 18px;
+        }
+        .support-card {
+            flex: 1;
+            background: #e3eafc;
+            border-radius: 8px;
+            padding: 18px 20px;
+            box-shadow: 0 2px 8px rgba(13,60,110,0.08);
+            text-align: center;
+            transition: box-shadow 0.3s, transform 0.3s;
+        }
+        .support-card:hover {
+            box-shadow: 0 8px 24px rgba(13,60,110,0.18);
+            transform: scale(1.04);
+        }
+        .document-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .document-list li {
+            background: #f4f6fb;
+            color: #0d3c6e;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+        }
+        .document-list li:hover {
+            background: #e3eafc;
+        }
+        .download-link {
+            color: #ff9800;
+            text-decoration: none;
+            font-weight: 500;
+            margin-left: auto;
+            transition: color 0.2s;
+        }
+        .download-link:hover {
+            color: #0d3c6e;
+        }
+        footer {
+            background: #dedede;
+            padding: 20px;
+            text-align: center;
+            margin-top: 40px;
+            border-top: 2px solid #bbb;
+        }
+        footer div {
+            margin: 4px 0;
+        }
+        @media (max-width: 1100px) {
+            .dashboard-sections {
+                grid-template-columns: 1fr;
+            }
+            .side-section {
+                flex-direction: row;
+                gap: 18px;
+            }
+        }
+        @media (max-width: 900px) {
+            .dashboard-container {
+                padding: 20px 10px;
+            }
+            .dashboard-header {
+                font-size: 1.3rem;
+            }
+            .navbar-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .navbar nav {
+                gap: 18px;
+                justify-content: center;
+            }
+            .navbar .actions {
+                justify-content: flex-end;
+                margin-top: 8px;
+            }
+        }
+    </style>
+    <script>
+        function filterOrders() {
+            const input = document.getElementById('orderFilter').value.toLowerCase();
+            const rows = document.querySelectorAll('.orders-table tbody tr');
+            rows.forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(input) ? '' : 'none';
+            });
+        }
+        function calculateRate() {
+            const distance = parseFloat(document.getElementById('distance').value) || 0;
+            const weight = parseFloat(document.getElementById('weight').value) || 0;
+            const rate = (distance * 12) + (weight * 2.5);
+            document.getElementById('rateResult').textContent = rate ? `Estimated Price: ₹${rate.toFixed(2)}` : '';
+        }
+        // Navbar pop on scroll
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if(window.scrollY > 40) {
+                navbar.classList.add('pop');
+            } else {
+                navbar.classList.remove('pop');
+            }
+        });
+        // Smooth scroll for nav links
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.navbar nav a').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const href = link.getAttribute('href');
+                    if(href.startsWith('#') && document.querySelector(href)) {
+                        e.preventDefault();
+                        document.querySelector(href).scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            });
+        });
+        // Show login/register only for guest user via URL parameter
+        function isGuestUser() {
+            return window.location.search.includes('guest=true');
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            var actionsDiv = document.querySelector('.navbar .actions');
+            var navbarContent = document.querySelector('.navbar-content');
+            // Show login/register for guest, show logout for logged-in users
+            if (isGuestUser() && actionsDiv) {
+                actionsDiv.style.display = 'flex';
+            } else if (actionsDiv) {
+                actionsDiv.style.display = 'none';
+                // Add logout button for logged-in users
+                if (navbarContent && !document.getElementById('logoutBtn')) {
+                    var logoutBtn = document.createElement('a');
+                    logoutBtn.textContent = 'Logout';
+                    logoutBtn.id = 'logoutBtn';
+                    logoutBtn.href = '../login and reg/home.html';
+                    logoutBtn.style.background = '#ff4d00';
+                    logoutBtn.style.color = '#fff';
+                    logoutBtn.style.padding = '10px 22px';
+                    logoutBtn.style.borderRadius = '6px';
+                    logoutBtn.style.textDecoration = 'none';
+                    logoutBtn.style.fontWeight = '700';
+                    logoutBtn.style.fontSize = '1.1rem';
+                    logoutBtn.style.boxShadow = '0 2px 8px rgba(255,77,0,0.12)';
+                    logoutBtn.style.border = 'none';
+                    logoutBtn.style.transition = 'background 0.2s, color 0.2s';
+                    logoutBtn.style.marginLeft = '18px';
+                    logoutBtn.addEventListener('mouseover', function() {
+                        logoutBtn.style.background = '#d13c00';
+                    });
+                    logoutBtn.addEventListener('mouseout', function() {
+                        logoutBtn.style.background = '#ff4d00';
+                    });
+                    navbarContent.appendChild(logoutBtn);
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <div class="logo">
+                <img src="../assets/truck-dashboard.jpg" alt="Logo">
+                <span>RTS</span>
+            </div>
+            <nav>
+                <a href="#orders">Orders</a>
+                <a href="#support">Support</a>
+                <a href="#aboutus">About Us</a>
+                <a href="#footer-contact" id="contactNavBtn">Contact Us</a>
+            </nav>
+            <div class="actions">
+                <a href="../login and reg/login.html">Login</a>
+                <a href="../login and reg/register.html">Register</a>
+            </div>
+        </div>
+    </div>
+    <div class="dashboard-container">
+        <div class="dashboard-header">Welcome to RAJMOHAN TRANSPORT SERVICES</div>
+        <div class="dashboard-sections">
+            <div class="main-section">
+                <div class="card" id="tracking">
+                    <div class="card-title"><i class="fas fa-map-marker-alt"></i> Live Tracking</div>
+                    <div class="live-map">
+                        <span>Map Placeholder (Integrate Google Maps or similar)</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress" style="width:70%"></div>
+                    </div>
+                    <div class="eta">ETA: 2 hrs 15 min</div>
+                </div>
+                <div class="card" id="orders">
+                    <div class="card-title"><i class="fas fa-truck"></i> Orders Table</div>
+                    <div class="filter-bar">
+                        <input type="text" id="orderFilter" placeholder="Filter shipments..." oninput="filterOrders()">
+                        <select>
+                            <option>All</option>
+                            <option>Delivered</option>
+                            <option>In Transit</option>
+                            <option>Pending</option>
+                        </select>
+                    </div>
+                    <table class="orders-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Origin</th>
+                                <th>Destination</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1001</td><td>Delhi</td><td>Mumbai</td><td>Delivered</td><td>2025-09-20</td><td>₹12,500</td></tr>
+                            <tr><td>1002</td><td>Chennai</td><td>Bangalore</td><td>In Transit</td><td>2025-09-26</td><td>₹8,200</td></tr>
+                            <tr><td>1003</td><td>Pune</td><td>Hyderabad</td><td>Pending</td><td>2025-09-28</td><td>₹9,800</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card" id="cost">
+                    <div class="card-title"><i class="fas fa-credit-card"></i> Cost & Payment</div>
+                    <div class="cost-cards">
+                        <div class="cost-card">
+                            <div class="cost-label">Total Paid</div>
+                            <div class="cost-value">₹30,500</div>
+                            <a href="#" class="quick-pay">Download Invoice</a>
+                        </div>
+                        <div class="cost-card">
+                            <div class="cost-label">Pending Payment</div>
+                            <div class="cost-value">₹9,800</div>
+                            <a href="#" class="quick-pay">Quick Pay</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" id="rate">
+                    <div class="card-title"><i class="fas fa-calculator"></i> Rate Calculator</div>
+                    <form class="rate-calc-form" oninput="calculateRate()">
+                        <input type="number" id="distance" placeholder="Distance (km)">
+                        <input type="number" id="weight" placeholder="Weight (MT)">
+                        <button type="button" onclick="calculateRate()">Calculate</button>
+                        <div class="rate-result" id="rateResult"></div>
+                    </form>
+                </div>
+            </div>
+            <div class="side-section">
+                <div class="card" id="notifications">
+                    <div class="card-title"><i class="fas fa-bell"></i> Notifications</div>
+                    <ul class="notifications-list">
+                        <li>Shipment #1002 is in transit.</li>
+                        <li class="important">Payment pending for shipment #1003.</li>
+                        <li>Support ticket #202 resolved.</li>
+                    </ul>
+                </div>
+                <div class="card" id="support">
+                    <div class="card-title"><i class="fas fa-headset"></i> Support</div>
+                    <div class="support-section">
+                        <div class="support-card">
+                            <div>Chat with Support</div>
+                            <a href="#" class="quick-pay">Start Chat</a>
+                        </div>
+                        <div class="support-card">
+                            <div>Report Issue</div>
+                            <a href="#" class="quick-pay">Report</a>
+                        </div>
+                        <div class="support-card">
+                            <div>Open Ticket</div>
+                            <a href="#" class="quick-pay">New Ticket</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" id="documents">
+                    <div class="card-title"><i class="fas fa-file-alt"></i> Document Center</div>
+                    <ul class="document-list">
+                        <li><i class="fas fa-file"></i> Waybill <a href="#" class="download-link">Download</a></li>
+                        <li><i class="fas fa-file-invoice"></i> Invoice <a href="#" class="download-link">Download</a></li>
+                        <li><i class="fas fa-file-signature"></i> PoD <a href="#" class="download-link">Download</a></li>
+                        <li><i class="fas fa-file-shield"></i> Compliance <a href="#" class="download-link">Download</a></li>
+                    </ul>
+                </div>
+                <div class="card" id="aboutus">
+                    <div class="card-title"><i class="fas fa-info-circle"></i> About Us</div>
+                    <div style="color:#0d3c6e; font-size:1rem; line-height:1.7;">
+                        <strong>Rajmohan Transport Services</strong> is dedicated to providing reliable, efficient, and safe transportation solutions for all your logistics needs. With a vast fleet and experienced team, we ensure timely deliveries, transparent pricing, and excellent customer support. Our mission is to connect businesses and individuals with the best transport options, making freight movement simple and hassle-free. <br><br>
+                        <strong>Why Choose Us?</strong><br>
+                        <ul style="margin-top:8px;">
+                            <li>Trusted by thousands of customers across India</li>
+                            <li>Real-time shipment tracking and updates</li>
+                            <li>Easy online booking and payment</li>
+                            <li>Dedicated support and quick issue resolution</li>
+                        </ul>
+                        <br>
+                        <span style="color:#ff9800; font-weight:500;">Contact us for more information or partnership opportunities!</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer id="footer-contact">
+        <div>&copy; RTS. All rights reserved.</div>
+        <div style="margin-top:16px; font-size:1.1rem; color:#222;">
+            <strong>Contact Us:</strong><br>
+            Phone: <a href="tel:+919876543210" style="color:#ff4d00; text-decoration:none;">+91-9876543210</a><br>
+            Email: <a href="mailto:info@rts.com" style="color:#ff4d00; text-decoration:none;">info@rts.com</a>
+        </div>
+    </footer>
+</body>
+</html>

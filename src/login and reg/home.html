@@ -15,6 +15,8 @@
         background: #dedede;
         font-family: 'Georgia', serif;
         box-sizing: border-box;
+        
+    
     }
     
     /* Add transition overlay */
@@ -37,6 +39,7 @@
         overflow-x: hidden;
         display: flex;
         flex-direction: column;
+        
     }
     header {
         text-align: center;
@@ -134,21 +137,23 @@
         text-align: center;
     }
     .guest-section button {
-        background: transparent;
-        color: #555;
-        border: 2px solid #999;
-        border-radius: 2rem;
-        padding: 0.7rem 2.8rem;
-        font-size: 1.5rem;
-        font-family: 'Georgia', serif;
-        cursor: pointer;
-        transition: all 0.2s;
-        box-shadow: none;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border: 2px solid #fff;
+    border-radius: 2rem;
+    padding: 0.7rem 2.8rem;
+    font-size: 1.5rem;
+    font-family: 'Georgia', serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    text-shadow: 1px 1px 4px #222;
     }
     .guest-section button:hover {
-        background: #f0f0f0;
-        border-color: #666;
-        color: #333;
+    background: #fff;
+    border-color: #ff4d00;
+    color: #ff4d00;
+    text-shadow: none;
     }
     .guest-section h4 {
         font-size: 1.25rem;
@@ -180,7 +185,8 @@
     <div class="truly">Delivering Trust, Safety, and Speed Across Every Journey</div>
     </header>
     <main>
-    <div style="font-size:1.5rem; color:#333; margin-bottom:0.7rem; font-family:'Georgia',serif; font-weight:400;">Welcome To,</div>
+            
+        <div style="font-size:1.5rem; color:#333; margin-bottom:0.7rem; font-family:'Georgia',serif; font-weight:400;">Welcome To,</div>
         <div class="logo-text">RAJMOHAN TRANSPORT SERVICES</div>
         <div class="auth-container">
             <div class="auth-row">
@@ -201,7 +207,7 @@
         </div>
     </main>
     <footer>
-        <div>&copy; YOURS. All rights reserved.</div>
+        <div>&copy; RTS. All rights reserved.</div>
     </footer>
     <div class="page-transition"></div>
     <script>
@@ -225,8 +231,7 @@
         const guestButton = document.querySelector('.guest-section button');
         if (guestButton) {
             guestButton.addEventListener('click', () => {
-                // Add guest page URL when implemented
-                handlePageTransition('guest.html');
+                handlePageTransition('../Dasboard/customer.html?guest=true');
             });
         }
 
