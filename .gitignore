@@ -3,3 +3,11 @@
 .git/
 
 node_modules/
+
+# Vscode folder
+.vscode/
+
+# Github folder
+# .github/
+
+# prompt.md
