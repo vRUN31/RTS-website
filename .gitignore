@@ -11,3 +11,9 @@ node_modules/
 # .github/
 
 # prompt.md
+
+#Cursor rules
+#.cursor
+
+# Next js folder
+.next/
