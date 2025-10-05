@@ -50,6 +50,18 @@ A transport logistics/trucking platform serving both consumers (clients) and the
    - Client analytics: Volume, revenue, on-time %, cancellations, dispute rates.
    - Freight analytics: Weight/volume distributions, average load factor, efficiency.
 
+7. Driver Management, Dispatch, and Notifications
+   - Driver registry with status (available, busy, off-duty), current location (via device/phone), skills/vehicle class, and active contracts.
+   - Smart assignment: when a client creates a shipment/order, select the best driver/truck based on proximity to pickup, capacity, duty status, current workload, SLA window, and historical reliability.
+   - Offer lifecycle: create a dispatch offer to the selected driver(s); driver can Accept/Reject considering ongoing contracts and legal duty limits.
+   - Notifications: admin-to-driver and system-to-driver push via multiple channels (in-app realtime, SMS, WhatsApp, email; pluggable provider); audit each notification.
+   - Fallbacks: if primary driver rejects or times out, auto-escalate to the next ranked driver; if no one accepts within SLA, alert admin.
+   - Visibility: admin console to monitor offers, responses, and auto-assignments; client sees ETA once a driver accepts.
+
+Reasoning:
+- Optimizes for on-time pickup while respecting compliance (duty hours) and ongoing commitments; minimizes deadhead distance and improves fleet utilization.
+- Multi-criteria selection beats naive nearest-driver because capacity, availability windows, and service SLAs matter as much as location.
+
 ## Non-functional requirements
 
 - Security: Role-based access control; secure auth; HTTPS; secrets vaulted; input validation.
@@ -65,6 +77,15 @@ A transport logistics/trucking platform serving both consumers (clients) and the
 - Contract(id, clientId, startAt, endAt, lanes[], baseRates, documents[])
 - Shipment(id, clientId, contractId?, truckId?, origin, destination, distanceKm, weightMT, status, eta, cost)
 - Telemetry(id, truckId, ts, lat, lng, speed, status)
+
+Driver & dispatch additions (Supabase):
+- Driver(id, user_id references profiles, name, phone, status['available','busy','off-duty'], home_base, skills jsonb, vehicle_id uuid nullable)
+- Vehicle(id, plate, type, capacity_mt, attrs jsonb)
+- DriverLocation(driver_id, ts, lat, lng, speed) — optional if not piggybacking on Truck telemetry
+- DispatchOffer(id, shipment_id, driver_id, rank int, status['pending','accepted','rejected','expired'], expires_at, created_at)
+- Notification(id, user_id, type['dispatch','system','reminder'], channel['inapp','sms','email','whatsapp'], payload jsonb, status['queued','sent','failed','read'], created_at, read_at)
+
+RLS: drivers may see only their own offers and notifications; clients see only their shipments; admins see all.
 
 ## API surface (to be implemented)
 
@@ -83,6 +104,18 @@ A transport logistics/trucking platform serving both consumers (clients) and the
 - Analytics: /api/analytics/overview?range=..., /api/analytics/trucks, /api/analytics/locations, /api/analytics/clients
 - Routing: /api/routes?origin=..&dest=..&algorithm=dijkstra|astar
 
+### Dispatch workflow APIs
+- POST /api/shipments/:id/dispatch — run selection and create DispatchOffer(s) with ranked candidates.
+- POST /api/dispatch/:offerId/accept — driver accepts; mark shipment assigned and set driver/truck.
+- POST /api/dispatch/:offerId/reject — driver rejects; move to next candidate or escalate after timeout.
+- GET /api/dispatch/:offerId — get offer status; used by driver clients.
+- Realtime: broadcast offer updates on channel `dispatch:driver:{driver_id}` and shipment updates on `shipment:{id}`.
+
+Selection algorithm rationale
+- Score candidate drivers d by: S = w1·proximity + w2·availability + w3·capacity_fit + w4·workload_inv + w5·sla_match + w6·reliability.
+- Proximity: haversine distance to pickup; Availability: status and duty time window; Capacity fit: matches vehicle capacity/type; Workload_inv: prefer lower current workload; SLA match: ability to meet pickup ETA; Reliability: historical acceptance/on-time rate.
+- Tie-breaking via nearest ETA and least detour from current path.
+
 ## UI pages (current + to add)
 
 - Landing: `src/login and reg/home.html` — buttons link to Register/Login; Guest opens customer dashboard with `?guest=true`.
@@ -91,6 +124,10 @@ A transport logistics/trucking platform serving both consumers (clients) and the
 - Customer dashboard: `src/Dasboard/customer.html` — map placeholder, orders table, cost, rate calculator, support, documents, about.
 - Admin dashboard (to add): `src/Dasboard/admin.html` — fleet live map, KPIs, recent contracts, left nav with "Contracts".
 - Contracts page (to add): `src/Dasboard/contracts.html` — list, filters (active/expired), detail view, renewal actions.
+
+Driver-facing UI (to add)
+- Driver portal/app: view active offers, accept/reject with reason, see assignments, navigate to pickup, mark arrival/departure, upload PoD.
+- Notifications center: shows recent dispatch/system notifications with read/unread state; updates via realtime.
 
 ## Navigation and UX patterns
 
@@ -103,6 +140,12 @@ A transport logistics/trucking platform serving both consumers (clients) and the
 - The site is static HTML. Serve over a static server during development. For Supabase, include a central `src/config/supabase.js` exporting the client using Public URL + Anon key (no service role in client).
 - Directory quirks: `src/Dasboard` (misspelling) and `src/login and reg` (contains a space). Keep paths consistent or plan a rename migration.
 - When adding new pages, co-locate simple CSS in-page to match existing convention; extract later if we formalize a framework.
+
+Dispatch implementation notes
+- Start with a simple nearest-available selection (distance + available status). Evolve weights/config in a table (e.g., dispatch_config) for tunable scoring.
+- Use Supabase Realtime to notify drivers in-app; for SMS/WhatsApp/email, enqueue records in `Notification` and process via an Edge Function and provider (e.g., Twilio/WhatsApp Business, SendGrid) — keep provider keys server-side.
+- Enforce constraints in database: unique accepted offer per shipment; triggers to auto-expire offers after `expires_at`.
+- For privacy and RLS, drivers only subscribe to their own dispatch channels; clients subscribe only to their shipments.
 
 ### Supabase schema sketch (initial)
 
