@@ -15,6 +15,16 @@ type Shipment = {
     created_at: string;
 };
 
+type Booking = {
+    id: string;
+    source_city: string | null;
+    destination_city: string | null;
+    weight_mt: number | null;
+    pickup_date: string | null;
+    status: string | null;
+    created_at: string;
+};
+
 export default function CustomerDashboardPage() {
     const [rows, setRows] = useState<Shipment[]>([]);
     const [q, setQ] = useState('');
@@ -22,6 +32,11 @@ export default function CustomerDashboardPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [clientId, setClientId] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
+    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [bookingsLoading, setBookingsLoading] = useState(false);
+    const [bookingsError, setBookingsError] = useState<string | null>(null);
+    const [reloadBookings, setReloadBookings] = useState(0);
     const [placing, setPlacing] = useState(false);
     const [showPlaceOrder, setShowPlaceOrder] = useState(false);
     const [placeError, setPlaceError] = useState<string | null>(null);
@@ -29,11 +44,17 @@ export default function CustomerDashboardPage() {
     const [form, setForm] = useState({
         source_city: '',
         destination_city: '',
+        vehicle_type: '',
         material: '',
         weight_mt: '',
         pickup_date: '',
         notes: '',
     });
+    // Rate calculator state
+    const [rateVehicle, setRateVehicle] = useState('Pickup (1.5T)');
+    const [rateDistance, setRateDistance] = useState('');
+    const [rateWeight, setRateWeight] = useState('');
+    const [rateEstimate, setRateEstimate] = useState<string>('—');
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -57,6 +78,7 @@ export default function CustomerDashboardPage() {
                             .maybeSingle();
                         clientId = profile?.client_id as string | undefined;
                         setClientId(profile?.client_id ?? null);
+                        setUserId(user.id);
                     }
                     const query = supabase
                         .from('shipments')
@@ -79,6 +101,45 @@ export default function CustomerDashboardPage() {
         };
     }, [supabaseUrl, supabaseAnonKey]);
 
+    // Load bookings for this user/client
+    useEffect(() => {
+        let mounted = true;
+        async function loadBookings() {
+            setBookingsError(null);
+            try {
+                if (!supabaseUrl || !supabaseAnonKey) {
+                    if (mounted) setBookings([]);
+                    return;
+                }
+                const supabase = createClient();
+                setBookingsLoading(true);
+                const base = supabase
+                    .from('bookings')
+                    .select('id, source_city, destination_city, weight_mt, pickup_date, status, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+                let res;
+                if (clientId) {
+                    res = await base.eq('client_id', clientId);
+                } else if (userId) {
+                    res = await base.eq('user_id', userId);
+                } else {
+                    if (mounted) setBookings([]);
+                    return;
+                }
+                const { data, error } = res;
+                if (error) throw error;
+                if (mounted) setBookings((data || []) as Booking[]);
+            } catch (e: any) {
+                if (mounted) setBookingsError(e?.message ?? 'Failed to load bookings');
+            } finally {
+                if (mounted) setBookingsLoading(false);
+            }
+        }
+        loadBookings();
+        return () => { mounted = false; };
+    }, [supabaseUrl, supabaseAnonKey, clientId, userId, reloadBookings]);
+
     const filtered = useMemo(() => {
         const term = q.trim().toLowerCase();
         return rows.filter((r) => {
@@ -88,23 +149,18 @@ export default function CustomerDashboardPage() {
         });
     }, [rows, q, status]);
 
+    function fmtDate(d: string | null | undefined) {
+        if (!d) return '—';
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return (d || '').slice(0, 10);
+        const dd = String(dt.getDate()).padStart(2, '0');
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const yyyy = dt.getFullYear();
+        return `${dd}-${mm}-${yyyy}`;
+    }
+
     return (
         <>
-            {/* Minimal navbar matching the static prototype */}
-                    <div className="navbar">
-                        <div className="navbar-content">
-                            <div className="logo">
-                                <span className="logo-text m-0">RTS</span>
-                            </div>
-                            <nav>
-                        <a href="#orders">Orders</a>
-                        <a href="#support">Support</a>
-                        <a href="#aboutus">About Us</a>
-                    </nav>
-                    <div className="actions" />
-                </div>
-            </div>
-
             <main className="dashboard-container">
                 <div className="dashboard-header mb-18">Welcome to RAJMOHAN TRANSPORT SERVICES</div>
                 <div className="grid-2-1">
@@ -119,8 +175,9 @@ export default function CustomerDashboardPage() {
                             <div className="eta">ETA: 2 hrs 15 min</div>
                         </div>
 
-                        <div className="panel" id="orders">
-                            <div className="panel-title">Orders</div>
+                        <div className="panel" id="shipments">
+                            <div className="panel-title">Shipments</div>
+                            <div className="text-primary leading-17 mb-18">Delivered or in-progress shipments created after booking approvals.</div>
                             <div className="row-gap-12">
                                 <input placeholder="Filter shipments..." className="filter-input" value={q} onChange={(e) => setQ(e.target.value)} />
                                 <select className="filter-input" aria-label="Status filter" value={status} onChange={(e) => setStatus(e.target.value as any)}>
@@ -153,7 +210,7 @@ export default function CustomerDashboardPage() {
                                                 <td>{row.origin ?? '—'}</td>
                                                 <td>{row.destination ?? '—'}</td>
                                                 <td>{row.status ?? '—'}</td>
-                                                <td>{row.created_at?.slice(0, 10)}</td>
+                                                <td>{fmtDate(row.created_at)}</td>
                                                 <td>{typeof row.cost === 'number' ? row.cost : '—'}</td>
                                             </tr>
                                         ))}
@@ -187,6 +244,7 @@ export default function CustomerDashboardPage() {
                                             client_id: clientId ?? null,
                                             source_city: form.source_city.trim(),
                                             destination_city: form.destination_city.trim(),
+                                            vehicle_type: form.vehicle_type || null,
                                             material: form.material.trim() || null,
                                             weight_mt: form.weight_mt ? Number(form.weight_mt) : null,
                                             pickup_date: form.pickup_date || null,
@@ -196,8 +254,10 @@ export default function CustomerDashboardPage() {
                                         const { error } = await supabase.from('bookings').insert(payload);
                                         if (error) throw error;
                                         setPlaceSuccess('Booking submitted! Our team will review and confirm.');
-                                        setForm({ source_city: '', destination_city: '', material: '', weight_mt: '', pickup_date: '', notes: '' });
+                                        setForm({ source_city: '', destination_city: '', vehicle_type: '', material: '', weight_mt: '', pickup_date: '', notes: '' });
                                         setShowPlaceOrder(false);
+                                        // Trigger a refresh of the bookings list
+                                        setReloadBookings((x) => x + 1);
                                     } catch (err: any) {
                                         setPlaceError(err?.message ?? 'Failed to submit booking');
                                     } finally {
@@ -206,6 +266,14 @@ export default function CustomerDashboardPage() {
                                 }}>
                                     <input className="filter-input" placeholder="Source City" value={form.source_city} onChange={(e) => setForm({ ...form, source_city: e.target.value })} required aria-label="Source City" />
                                     <input className="filter-input" placeholder="Destination City" value={form.destination_city} onChange={(e) => setForm({ ...form, destination_city: e.target.value })} required aria-label="Destination City" />
+                                    <select className="filter-input" aria-label="Vehicle Type" value={form.vehicle_type} onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })} required>
+                                        <option value="">Select Vehicle Type</option>
+                                        <option value="Pickup (1.5T)">Pickup (1.5T)</option>
+                                        <option value="LCV (3.5T)">LCV (3.5T)</option>
+                                        <option value="Truck (9T)">Truck (9T)</option>
+                                        <option value="Truck (16T)">Truck (16T)</option>
+                                        <option value="Trailer (25T)">Trailer (25T)</option>
+                                    </select>
                                     <input className="filter-input" placeholder="Material" value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} aria-label="Material" />
                                     <input className="filter-input" placeholder="Weight (MT)" type="number" step="0.01" value={form.weight_mt} onChange={(e) => setForm({ ...form, weight_mt: e.target.value })} aria-label="Weight (MT)" />
                                     <input className="filter-input" placeholder="Pickup Date" type="date" value={form.pickup_date} onChange={(e) => setForm({ ...form, pickup_date: e.target.value })} aria-label="Pickup Date" />
@@ -220,13 +288,79 @@ export default function CustomerDashboardPage() {
                             )}
                         </div>
 
+                        <div className="panel" id="my-bookings">
+                            <div className="panel-title">My Bookings</div>
+                            <div className="text-primary leading-17 mb-18">Requests you submitted for approval. Approved bookings appear later as shipments.</div>
+                            {bookingsLoading && <div>Loading…</div>}
+                            {bookingsError && <div role="alert">{bookingsError}</div>}
+                            {!bookingsLoading && !bookingsError && (
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Source</th>
+                                            <th>Destination</th>
+                                            <th>Weight (MT)</th>
+                                            <th>Pickup</th>
+                                            <th>Status</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {bookings.map((b) => (
+                                            <tr key={b.id}>
+                                                <td>{b.id.slice(0,8)}…</td>
+                                                <td>{b.source_city ?? '—'}</td>
+                                                <td>{b.destination_city ?? '—'}</td>
+                                                <td>{typeof b.weight_mt === 'number' ? b.weight_mt : '—'}</td>
+                                                <td>{fmtDate(b.pickup_date)}</td>
+                                                <td>{b.status ?? '—'}</td>
+                                                <td>{fmtDate(b.created_at)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
                         <div className="panel" id="rate">
                             <div className="panel-title">Rate Calculator</div>
                             <div className="calc-column">
-                                <input placeholder="Distance (km)" className="filter-input" />
-                                <input placeholder="Weight (MT)" className="filter-input" />
-                                <button className="btn-dark">Calculate</button>
-                                <div className="eta">Estimated Price: —</div>
+                                <select className="filter-input" aria-label="Vehicle Type for Rate" value={rateVehicle} onChange={(e) => setRateVehicle(e.target.value)}>
+                                    <option value="Pickup (1.5T)">Pickup (1.5T)</option>
+                                    <option value="LCV (3.5T)">LCV (3.5T)</option>
+                                    <option value="Truck (9T)">Truck (9T)</option>
+                                    <option value="Truck (16T)">Truck (16T)</option>
+                                    <option value="Trailer (25T)">Trailer (25T)</option>
+                                </select>
+                                <input placeholder="Distance (km)" className="filter-input" value={rateDistance} onChange={(e) => setRateDistance(e.target.value)} />
+                                <input placeholder="Weight (MT)" className="filter-input" value={rateWeight} onChange={(e) => setRateWeight(e.target.value)} />
+                                <button className="btn-dark" onClick={(e) => {
+                                    e.preventDefault();
+                                    const distance = parseFloat(rateDistance || '0');
+                                    const weight = parseFloat(rateWeight || '0');
+                                    const basePerKm: Record<string, number> = {
+                                        'Pickup (1.5T)': 18,
+                                        'LCV (3.5T)': 24,
+                                        'Truck (9T)': 32,
+                                        'Truck (16T)': 38,
+                                        'Trailer (25T)': 45,
+                                    };
+                                    const minCharge: Record<string, number> = {
+                                        'Pickup (1.5T)': 1200,
+                                        'LCV (3.5T)': 1600,
+                                        'Truck (9T)': 2200,
+                                        'Truck (16T)': 2800,
+                                        'Trailer (25T)': 3600,
+                                    };
+                                    const perKm = basePerKm[rateVehicle] ?? 30;
+                                    const min = minCharge[rateVehicle] ?? 2000;
+                                    const weightFactor = Math.max(1, weight / 5);
+                                    const estimate = Math.max(min, Math.round(perKm * distance * weightFactor));
+                                    setRateEstimate(`₹${estimate.toLocaleString('en-IN')}`);
+                                }}>Calculate</button>
+                                <div className="eta">Estimated Price: {rateEstimate}</div>
+                                <div className="text-muted">Note: Rates shown are indicative and may vary with real conditions (traffic, tolls, loading, waiting).</div>
                             </div>
                         </div>
                     </section>

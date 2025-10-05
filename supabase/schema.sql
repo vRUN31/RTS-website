@@ -166,6 +166,7 @@ create table if not exists bookings (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users on delete cascade,
   client_id uuid references clients(id) on delete cascade,
+  vehicle_type text,
   source_city text not null,
   destination_city text not null,
   material text,
@@ -205,3 +206,7 @@ create policy "bookings client insert" on bookings for insert with check (
 );
 
 create index if not exists idx_bookings_client_created on bookings(client_id, created_at);
+
+-- Ensure vehicle_type exists for legacy databases
+alter table if exists bookings
+  add column if not exists vehicle_type text;

@@ -1,0 +1,72 @@
+"use client";
+import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+
+type Profile = { id: string; role: 'admin' | 'client' | null };
+
+export default function UserMenu() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!mounted) return;
+      setEmail(user?.email ?? null);
+      if (user?.id) {
+        const { data } = await supabase.from('profiles').select('id, role').eq('id', user.id).maybeSingle();
+        if (!mounted) return;
+        if (data) setProfile({ id: data.id, role: (data as any).role });
+      }
+    })();
+    return () => { mounted = false; };
+  }, [supabase]);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, []);
+
+  if (!email) {
+    return (
+      <div className="user-menu">
+        <a className="btn-login" href="/login">Login</a>
+        <a className="btn-signup" href="/register">Sign up</a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="user-menu" ref={menuRef}>
+  <button className="user-avatar" aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
+        <span className="avatar-circle" aria-hidden>{email[0]?.toUpperCase() ?? 'U'}</span>
+        <span className="email">{email}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div className="user-dropdown" role="menu">
+          {profile?.role === 'admin' && (
+            <a className="dropdown-item" href="/admin" role="menuitem">Admin Dashboard</a>
+          )}
+          <a className="dropdown-item" href="/settings" role="menuitem">Settings</a>
+          <button className="dropdown-item danger" role="menuitem" onClick={async () => {
+            await supabase.auth.signOut();
+            router.push('/login');
+          }}>Logout</button>
+        </div>
+      )}
+    </div>
+  );
+}
