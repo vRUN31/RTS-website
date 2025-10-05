@@ -4,7 +4,7 @@ import { createClient as createServerSupabase } from '@/utils/supabase/server';
 import LeafletMap from '@/src/components/map/LeafletMap.client';
 import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
 
-export default async function AdminDashboard({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+export default async function AdminDashboard({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
     // SSR guard: only admins may access
     const cookieStore = await cookies();
     const supabase = createServerSupabase(cookieStore as any);
@@ -21,10 +21,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
     // Date range and grain controls
     const now = new Date();
-    const range = (typeof searchParams?.range === 'string' ? searchParams?.range : 'month') as 'hour'|'day'|'month'|'year';
-    const grain = (typeof searchParams?.grain === 'string' ? searchParams?.grain : range) as 'hour'|'day'|'month'|'year';
-    const startParam = typeof searchParams?.start === 'string' ? searchParams?.start : undefined;
-    const endParam = typeof searchParams?.end === 'string' ? searchParams?.end : undefined;
+    const params = await searchParams;
+    const range = (typeof params?.range === 'string' ? params?.range : 'month') as 'hour'|'day'|'month'|'year';
+    const grain = (typeof params?.grain === 'string' ? params?.grain : range) as 'hour'|'day'|'month'|'year';
+    const startParam = typeof params?.start === 'string' ? params?.start : undefined;
+    const endParam = typeof params?.end === 'string' ? params?.end : undefined;
     const endDate = endParam ? new Date(endParam) : now;
     const startDate = startParam ? new Date(startParam) : new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
