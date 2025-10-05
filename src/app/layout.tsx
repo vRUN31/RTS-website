@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import React from 'react';
 import './globals.css';
+import UserMenu from './_user-menu.client';
 import Effects from './_effects.client';
+import MainNav from './_main-nav.client';
 
 export const metadata: Metadata = {
 	title: 'Raj Mohan Transport Services',
@@ -22,7 +24,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 			</head>
 			<body>
 				<Effects />
-				{children}
+				<header className="topbar">
+					<div className="topbar-inner">
+						<a className="brand" href="/">RTS</a>
+						<UserMenu />
+					</div>
+				</header>
+				<div className="topnav-row">
+					<MainNav />
+				</div>
+				<main className="app-main">
+					{children}
+				</main>
 			</body>
 		</html>
 	);

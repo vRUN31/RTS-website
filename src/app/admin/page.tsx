@@ -7,46 +7,42 @@ import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
 export default async function AdminDashboard({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
     // SSR guard: only admins may access
     const cookieStore = await cookies();
-    const supabase = createServerSupabase(cookieStore);
+    const supabase = createServerSupabase(cookieStore as any);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-        redirect('/login');
-    }
+    if (!user) redirect('/login');
+
     const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .maybeSingle();
-    if (error) {
-        // In case of RLS/policy issues, fail closed
-        redirect('/login');
-    }
-    if (profile?.role !== 'admin') {
-        redirect('/dashboard/customer');
-    }
+    if (error) redirect('/login');
+    if (profile?.role !== 'admin') redirect('/dashboard/customer');
+
     // Date range and grain controls
     const now = new Date();
-    const range = (typeof searchParams?.range === 'string' ? searchParams?.range : 'month') as 'hour'|'day'|'month'|'year';
-    const grain = (typeof searchParams?.grain === 'string' ? searchParams?.grain : range) as 'hour'|'day'|'month'|'year';
+    const grain = (typeof searchParams?.grain === 'string' ? searchParams?.grain : 'month') as 'hour'|'day'|'month'|'year';
     const startParam = typeof searchParams?.start === 'string' ? searchParams?.start : undefined;
     const endParam = typeof searchParams?.end === 'string' ? searchParams?.end : undefined;
     const endDate = endParam ? new Date(endParam) : now;
     const startDate = startParam ? new Date(startParam) : new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
-    // Fetch basic KPIs and recent shipments (admin-wide, filtered by date range)
+    // Basic KPIs
     const { count: trucksCount } = await supabase
         .from('trucks')
         .select('id', { count: 'exact', head: true });
-    const baseShipmentsCount = supabase
+
+    const { count: shipmentsCount } = await supabase
         .from('shipments')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
-    const { count: shipmentsCount } = await baseShipmentsCount;
+
     const { count: contractsCount } = await supabase
         .from('contracts')
         .select('id', { count: 'exact', head: true });
 
+    // Recent shipments
     const { data: recentShipments } = await supabase
         .from('shipments')
         .select('id, origin, destination, status, created_at')
@@ -55,8 +51,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         .order('created_at', { ascending: false })
         .limit(8);
 
-    // Telemetry-derived KPIs
-    // 1) On-time %: delivered_at <= eta among delivered shipments
+    // On-time %
     const { data: deliveredShipments } = await supabase
         .from('shipments')
         .select('id, eta, delivered_at')
@@ -69,9 +64,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         onTimePct = Math.round((onTimeCount / deliveredShipments.length) * 100);
     }
 
-    // 2) Average speed and 3) Idling hours from telemetry
-    // We approximate average speed as avg of "speed" points for the time range.
-    // Idling hours: sum durations where speed <= 2 km/h (heuristic), aggregated per truck.
+    // Telemetry KPIs
     const { data: telemetryRows } = await supabase
         .from('telemetry')
         .select('truck_id, ts, speed')
@@ -79,15 +72,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         .lte('ts', endDate.toISOString())
         .order('truck_id', { ascending: true })
         .order('ts', { ascending: true });
-
     let avgSpeedKph = 0;
     let idlingHours = 0;
     if (telemetryRows && telemetryRows.length > 0) {
-        // Average speed
         const speeds = telemetryRows.map(r => Number(r.speed) || 0);
-        avgSpeedKph = speeds.reduce((a, b) => a + b, 0) / speeds.length;
-
-        // Idling: sum time between consecutive points where both speeds <= 2
+        avgSpeedKph = Math.round((speeds.reduce((a, b) => a + b, 0) / speeds.length) * 10) / 10;
         for (let i = 1; i < telemetryRows.length; i++) {
             const prev = telemetryRows[i - 1];
             const curr = telemetryRows[i];
@@ -96,17 +85,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             const currSpeed = Number(curr.speed) || 0;
             if (prevSpeed <= 2 && currSpeed <= 2) {
                 const dtMs = new Date(curr.ts).getTime() - new Date(prev.ts).getTime();
-                if (dtMs > 0 && dtMs < 1000 * 60 * 60 * 6) { // cap single gap at 6h to avoid data holes
-                    idlingHours += dtMs / (1000 * 60 * 60);
-                }
+                if (dtMs > 0 && dtMs < 1000 * 60 * 60 * 6) idlingHours += dtMs / (1000 * 60 * 60);
             }
         }
-        idlingHours = Math.round(idlingHours * 10) / 10; // 0.1h precision
-        avgSpeedKph = Math.round(avgSpeedKph * 10) / 10;
+        idlingHours = Math.round(idlingHours * 10) / 10;
     }
 
-    // Aggregations for analytics (simple approximations using PostgREST RPC-like patterns)
-    // Shipments by status (counts)
+    // Aggregations
     const shipmentsStatusCounts: Record<string, number> = {};
     for (const s of ['pending', 'in_transit', 'delivered']) {
         const { count } = await supabase
@@ -117,7 +102,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             .lte('created_at', endDate.toISOString());
         shipmentsStatusCounts[s] = count ?? 0;
     }
-    // Shipments per month (last 6 months)
+
     const { data: spm } = await supabase
         .from('shipments')
         .select('created_at')
@@ -130,11 +115,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         const key = bucketKey(d, grain);
         spmBuckets.set(key, (spmBuckets.get(key) ?? 0) + 1);
     });
-    const shipmentsPerMonth = {
-        labels: Array.from(spmBuckets.keys()),
-        values: Array.from(spmBuckets.values()),
-    };
-    // Distance per month (km) — sums distance_km when provided
+    const shipmentsPerMonth = { labels: Array.from(spmBuckets.keys()), values: Array.from(spmBuckets.values()) };
+
     const { data: dpm } = await supabase
         .from('shipments')
         .select('created_at, distance_km')
@@ -148,11 +130,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         const val = Number(row.distance_km) || 0;
         dpmBuckets.set(key, (dpmBuckets.get(key) ?? 0) + val);
     });
-    const distancePerMonth = {
-        labels: Array.from(dpmBuckets.keys()),
-        values: Array.from(dpmBuckets.values()),
-    };
-    // Revenue per month — sums cost when provided
+    const distancePerMonth = { labels: Array.from(dpmBuckets.keys()), values: Array.from(dpmBuckets.values()) };
+
     const { data: rpm } = await supabase
         .from('shipments')
         .select('created_at, cost')
@@ -166,25 +145,20 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         const val = Number(row.cost) || 0;
         rpmBuckets.set(key, (rpmBuckets.get(key) ?? 0) + val);
     });
-    const revenuePerMonth = {
-        labels: Array.from(rpmBuckets.keys()),
-        values: Array.from(rpmBuckets.values()),
-    };
-    // Trucks by status (counts)
+    const revenuePerMonth = { labels: Array.from(rpmBuckets.keys()), values: Array.from(rpmBuckets.values()) };
+
     const trucksByStatus: Record<string, number> = {};
     for (const s of ['running', 'halt', 'offline']) {
         const { count } = await supabase
             .from('trucks')
             .select('id', { count: 'exact', head: true })
-            .eq('status', s)
-            .gte('created_at', startDate.toISOString())
-            .lte('created_at', endDate.toISOString());
+            .eq('status', s);
         trucksByStatus[s] = count ?? 0;
     }
 
     return (
         <main className="dashboard-container">
-            <h1 className="panel-title">Admin Dashboard</h1>
+            <h1 className="section-title text-center">Admin Dashboard</h1>
 
             {/* Quick filters and actions */}
             <div className="row-between mt-16">
@@ -196,7 +170,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                 </div>
                 <div className="row-gap-12">
                     <a className="btn-dark" href={`/contracts`}>Create Contract</a>
-                    <a className="btn-dark" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`}>Export Shipments CSV</a>
+                    <a className="btn-dark" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`}>Export CSV</a>
                 </div>
             </div>
 
@@ -214,50 +188,35 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                 <button className="btn-dark" type="submit">Apply</button>
             </form>
 
+            {/* KPIs at a glance */}
             <section className="grid-3 mt-16">
-                <div className="panel">
-                    <div className="panel-title">Trucks</div>
-                    <div className="dashboard-header">{trucksCount ?? '—'}</div>
-                </div>
-                <div className="panel">
-                    <div className="panel-title">Shipments</div>
-                    <div className="dashboard-header">{shipmentsCount ?? '—'}</div>
-                </div>
-                <div className="panel">
-                    <div className="panel-title">Contracts</div>
-                    <div className="dashboard-header">{contractsCount ?? '—'}</div>
-                </div>
+                <div className="panel tight card-surface"><div className="panel-title">Trucks</div><div className="kpi-number">{trucksCount ?? '—'}</div></div>
+                <div className="panel tight card-surface"><div className="panel-title">Shipments</div><div className="kpi-number">{shipmentsCount ?? '—'}</div></div>
+                <div className="panel tight card-surface"><div className="panel-title">Contracts</div><div className="kpi-number">{contractsCount ?? '—'}</div></div>
             </section>
 
             <section className="grid-3 mt-16">
-                <div className="panel">
-                    <div className="panel-title">On-time Delivery %</div>
-                    <div className="dashboard-header">{Number.isFinite(onTimePct) ? `${onTimePct}%` : '—'}</div>
-                </div>
-                <div className="panel">
-                    <div className="panel-title">Avg Speed (km/h)</div>
-                    <div className="dashboard-header">{Number.isFinite(avgSpeedKph) ? avgSpeedKph : '—'}</div>
-                </div>
-                <div className="panel">
-                    <div className="panel-title">Idling Hours</div>
-                    <div className="dashboard-header">{Number.isFinite(idlingHours) ? idlingHours : '—'}</div>
-                </div>
+                <div className="panel tight card-surface"><div className="panel-title">On-time Delivery %</div><div className="kpi-number">{Number.isFinite(onTimePct) ? `${onTimePct}%` : '—'}</div></div>
+                <div className="panel tight card-surface"><div className="panel-title">Avg Speed (km/h)</div><div className="kpi-number">{Number.isFinite(avgSpeedKph) ? avgSpeedKph : '—'}</div></div>
+                <div className="panel tight card-surface"><div className="panel-title">Idling Hours</div><div className="kpi-number">{Number.isFinite(idlingHours) ? idlingHours : '—'}</div></div>
             </section>
 
-            <div className="mt-16">
-                <LeafletMap mode="admin" height={420} />
-            </div>
+            {/* Map */}
+            <section className="mt-16 card-surface"><LeafletMap mode="admin" height={420} /></section>
 
             {/* Analytics & Charts */}
-            <AdminAnalytics
-                shipmentsStatusCounts={shipmentsStatusCounts}
-                shipmentsPerMonth={shipmentsPerMonth}
-                distancePerMonth={distancePerMonth}
-                revenuePerMonth={revenuePerMonth}
-                trucksByStatus={trucksByStatus}
-            />
+            <section className="mt-16 card-surface">
+                <AdminAnalytics
+                    shipmentsStatusCounts={shipmentsStatusCounts}
+                    shipmentsPerMonth={shipmentsPerMonth}
+                    distancePerMonth={distancePerMonth}
+                    revenuePerMonth={revenuePerMonth}
+                    trucksByStatus={trucksByStatus}
+                />
+            </section>
 
-            <section className="panel mt-16">
+            {/* Recent shipments */}
+            <section className="panel mt-16 card-surface">
                 <div className="panel-title">Recent Shipments</div>
                 <table className="table">
                     <thead>
@@ -282,10 +241,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                     </tbody>
                 </table>
             </section>
-
-            <nav className="mt-16">
-                <a href="/contracts" className="link-primary">Go to Contracts</a>
-            </nav>
         </main>
     );
 }
@@ -298,7 +253,6 @@ function bucketKey(d: Date, grain: 'hour'|'day'|'month'|'year') {
 }
 
 function toLocalInputValue(d: Date) {
-    // Convert to local ISO-like string without timezone, suitable for datetime-local
     const pad = (n: number) => String(n).padStart(2, '0');
     const yyyy = d.getFullYear();
     const mm = pad(d.getMonth() + 1);
