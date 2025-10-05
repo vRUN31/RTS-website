@@ -12,16 +12,20 @@ Done (MVP scaffolding):
 - Global styles and utilities in `src/app/globals.css`; page transition effects in a small client component.
 - Supabase setup: browser client helper (`@/utils/supabase/client`), server helper for SSR (`@/utils/supabase/server`), middleware helper; environment keys via `.env.local`.
 - Path alias configured: `@/*` resolves to project root (see `tsconfig.json`).
-- Auth pages wired to Supabase client helper: `src/app/login`, `src/app/register`, `src/app/forgot-password` with graceful fallback to demo behavior if env keys are missing.
+- Auth pages wired to Supabase client helper: `src/app/login`, `src/app/register`, `src/app/forgot-password` with graceful fallback to demo behavior if env keys are missing. Admin sign-up/login is gated by allowed email domains and/or explicit admin emails.
 - Landing page (`src/app/page.tsx`) is an async server component; contains an optional Supabase read example.
-- Admin and Contracts pages exist as stubs; Customer dashboard page scaffolded.
+- Admin page includes an SSR guard enforcing admin role; Customer dashboard scaffolded.
+- Admin dashboard upgraded: live map, KPI cards (trucks, shipments, contracts), date/grain controls (hour/day/month/year), analytics charts (Shipments by Status, Shipments/Range, Trucks by Status, Distance/Range, Revenue/Range), quick actions (Create Contract, Export CSV), and a Recent Shipments table.
+- CSV export: `/src/app/admin/export/shipments/route.ts` provides a CSV export of shipments filtered by `start`/`end` query params.
+- Contracts page wired to Supabase with Active/Expired filters and a minimal "Create Contract" stub form.
 
 In progress / not yet implemented:
 
-- Supabase schema (profiles/roles, contracts, shipments, trucks, telemetry) not migrated/applied yet; pages use placeholders for data.
-- Role-based redirect post-login (admin → `/admin`, client → `/dashboard/customer`) pending profile lookup; currently uses the UI role toggle as demo.
-- GPS map and realtime telemetry are placeholders.
-- Orders/Shipments table not yet backed by Supabase; Contracts module not yet wired to DB.
+- Supabase schema exists in `supabase/schema.sql` and seed in `supabase/seed.sql`; ensure they are applied to your Supabase project to enable live data. Pages assume `profiles`, `trucks`, `shipments`, `contracts`, and `telemetry` tables with RLS.
+- Role-based redirect post-login is handled via `profiles.role` with admin gating by domain and explicit email allowlist; SSR guard protects `/admin`.
+- GPS map and realtime telemetry implemented with a client-only Leaflet component and Supabase Realtime; admin vs client visibility enforced. Client map fetch uses a safe two-step query (shipments → truck_ids → trucks) to avoid implicit joins and reduce errors when FKs or RLS are not fully configured. Error logging improved to surface `message/details/hint`.
+- Telemetry-derived KPIs (on-time %, idling hours, average speed) and broader analytics (fuel, halts, speed segments, geo segments) — planned next.
+- Date-range picker UI (custom start/end) in addition to quick range buttons — planned.
 - Notifications/Dispatch flows outlined but not implemented.
 
 Notes on scope: “Complete the whole project” includes database schema, RLS policies, realtime, routing APIs, and multiple admin/client features which require coordinated DB provisioning and UI wiring. The foundation is in place; the remaining work is enumerated below under “Next milestones” with concrete, incremental steps.
@@ -46,6 +50,8 @@ A transport logistics/trucking platform serving both consumers (clients) and the
 
 1. Live Location Catalog (GPS)
    - Ingest data from physical GPS devices installed in trucks (hardware trackers or driver app). Support a polling adapter and a realtime adapter.
+      - Frontend map: Leaflet.js component renders live truck markers. Admins see full telemetry and "More info" popup; clients see only truck plate/identifier and current package location.
+   - GPS hardware integration: create an adapter that posts telemetry to the Supabase `telemetry` table (truck_id, ts, lat, lng, speed, status). Realtime subscriptions move markers instantly.
    - Continuously update truck status: running/halt, speed, heading, ignition, last updated time, current lat/lng.
    - Normalize device payloads into a unified Telemetry model; dedupe bursts and store downsampled history for analytics.
    - Display on a map (per-truck and fleet overview) with status badges (running/halt/offline) and last update age.
@@ -168,8 +174,8 @@ Current Next.js pages (source of truth):
 - Register: `src/app/register/page.tsx` — client component using `@/utils/supabase/client` to sign up; demo fallback.
 - Forgot password: `src/app/forgot-password/page.tsx` — client component using `@/utils/supabase/client` to send reset email with redirect.
 - Customer dashboard: `src/app/dashboard/customer/page.tsx` — UI scaffold; shows guest mode if `?guest=true` (to be wired).
-- Admin dashboard: `src/app/admin/page.tsx` — stub in place.
-- Contracts: `src/app/contracts/page.tsx` — stub in place.
+- Admin dashboard: `src/app/admin/page.tsx` — live fleet map, KPI cards, date/grain filters, analytics charts, quick actions, CSV export, and recent shipments.
+- Contracts: `src/app/contracts/page.tsx` — Active/Expired filters and a minimal Create Contract stub form (writes to Supabase when schema exists).
 
 Legacy static HTML prototypes (kept for reference):
 
@@ -197,7 +203,9 @@ Driver-facing UI (to add)
 
 - Framework: Next.js (App Router) with TypeScript. Source pages live in `src/app/*`. The top-level `app/*` only re-export from `src/app/*` to avoid duplication.
 - Styling: Global utilities in `src/app/globals.css`. Page transition effects via a small client component.
+- Mapping: `src/components/map/LeafletMap.client.tsx` is the client-only Leaflet component. It fetches initial trucks and subscribes to Supabase Realtime on `telemetry` to update positions. The layout includes Leaflet CSS via CDN. In Server Components (like the admin page), import this client component directly — do not wrap with `next/dynamic({ ssr:false })`.
 - Supabase: Use `@/utils/supabase/client` in client components, `@/utils/supabase/server` for SSR with cookies, and middleware helper if needed. Do not expose service role keys.
+   - Admin gating: set `NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS` and/or `NEXT_PUBLIC_ADMIN_EMAILS` to control who can be admin. Ensure `profiles` has a self-insert RLS policy so sign-ups can upsert their own profile rows.
 - Environment: Configure `.env.local` with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Path alias: `@/*` resolves to the project root (see `tsconfig.json`).
 - Legacy static HTML: Kept under `src/Dasboard` and `src/login and reg` for reference; Next.js routes do not serve them.
@@ -230,6 +238,10 @@ Dispatch implementation notes
 - telemetry(id bigint PK, truck_id uuid references trucks, ts timestamptz, lat double, lng double, speed numeric, status text)
 - contracts(id uuid PK, client_id uuid references clients, start_at date, end_at date, lanes jsonb, base_rates jsonb, documents jsonb)
 - shipments(id uuid PK, client_id uuid references clients, contract_id uuid references contracts, truck_id uuid references trucks, origin text, destination text, distance_km numeric, weight_mt numeric, status text, eta timestamptz, cost numeric)
+
+Telemetry ingestion adapter
+
+- Hardware → Adapter → Supabase: An adapter process polls or receives webhooks from GPS devices and writes rows into `telemetry(truck_id, ts, lat, lng, speed, status)`. The UI listens on a Supabase Realtime channel for INSERT events and moves markers. Admins see detailed telemetry + More info; clients see limited info (model + current coordinates for their shipments' assigned trucks only).
 
 RLS policies: clients can only see their rows; admins can see all.
 

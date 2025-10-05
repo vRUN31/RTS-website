@@ -12,21 +12,41 @@ export default async function HomePage() {
     } catch { /* ignore in demo */ }
 
     return (
-        <main className="main-center-screen">
-            <div className="truly">Delivering Trust, Safety, and Speed Across Every Journey</div>
-            <div className="logo-text">RAJMOHAN TRANSPORT SERVICES</div>
-            <div className="btn-row">
-                <a data-transition href="/register" className="cta-primary">Sign Up</a>
-                <a data-transition href="/login" className="cta-primary">Login</a>
-                <a data-transition href="/dashboard/customer?guest=true" className="cta-ghost">Guest</a>
-            </div>
-            {Array.isArray(todos) && todos.length > 0 && (
-                <ul className="mt-32">
-                    {todos.map((t: any, i: number) => (
-                        <li key={t.id ?? i}>{typeof t === 'string' ? t : JSON.stringify(t)}</li>
-                    ))}
-                </ul>
-            )}
-        </main>
+        <>
+            <header className="site-header">
+                <div className="truly">Delivering Trust, Safety, and Speed Across Every Journey</div>
+            </header>
+            <main className="main-center-screen">
+                <div className="welcome-sub">Welcome To,</div>
+                <div className="logo-text">RAJMOHAN TRANSPORT SERVICES</div>
+                <div className="auth-container">
+                    <div className="auth-row">
+                        <div className="auth-section">
+                            <h4>New Member?</h4>
+                            <a data-transition href="/register" className="cta-primary">Sign Up</a>
+                        </div>
+                        <div className="divider" />
+                        <div className="auth-section">
+                            <h4>Already a Member?</h4>
+                            <a data-transition href="/login" className="cta-primary">Login</a>
+                        </div>
+                    </div>
+                    <div className="guest-section">
+                        <h4>Just want to explore? No Problem.<br />Continue as,</h4>
+                        <a data-transition href="/dashboard/customer?guest=true" className="cta-ghost">Guest</a>
+                    </div>
+                </div>
+                {Array.isArray(todos) && todos.length > 0 && (
+                    <ul className="mt-32">
+                        {todos.map((t: any, i: number) => (
+                            <li key={t.id ?? i}>{typeof t === 'string' ? t : JSON.stringify(t)}</li>
+                        ))}
+                    </ul>
+                )}
+            </main>
+            <footer className="text-center mt-32">
+                <div>&copy; RTS. All rights reserved.</div>
+            </footer>
+        </>
     );
 }

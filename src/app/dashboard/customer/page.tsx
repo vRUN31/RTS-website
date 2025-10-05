@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import dynamic from 'next/dynamic';
+
+const LeafletMap = dynamic(() => import('@/src/components/map/LeafletMap.client'), { ssr: false });
 
 type Shipment = {
     id: string;
@@ -18,6 +21,19 @@ export default function CustomerDashboardPage() {
     const [status, setStatus] = useState<'all' | 'pending' | 'in_transit' | 'delivered'>('all');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [clientId, setClientId] = useState<string | null>(null);
+    const [placing, setPlacing] = useState(false);
+    const [showPlaceOrder, setShowPlaceOrder] = useState(false);
+    const [placeError, setPlaceError] = useState<string | null>(null);
+    const [placeSuccess, setPlaceSuccess] = useState<string | null>(null);
+    const [form, setForm] = useState({
+        source_city: '',
+        destination_city: '',
+        material: '',
+        weight_mt: '',
+        pickup_date: '',
+        notes: '',
+    });
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -40,6 +56,7 @@ export default function CustomerDashboardPage() {
                             .eq('id', user.id)
                             .maybeSingle();
                         clientId = profile?.client_id as string | undefined;
+                        setClientId(profile?.client_id ?? null);
                     }
                     const query = supabase
                         .from('shipments')
@@ -77,7 +94,7 @@ export default function CustomerDashboardPage() {
                     <div className="navbar">
                         <div className="navbar-content">
                             <div className="logo">
-                                <span className="logo-text" style={{ margin: 0 }}>RTS</span>
+                                <span className="logo-text m-0">RTS</span>
                             </div>
                             <nav>
                         <a href="#orders">Orders</a>
@@ -93,9 +110,9 @@ export default function CustomerDashboardPage() {
                 <div className="grid-2-1">
                     {/* suppress hydration mismatches from password manager/browser extensions injecting attributes */}
                     <section suppressHydrationWarning>
-                        <div className="panel" id="tracking">
+                            <div className="panel" id="tracking">
                             <div className="panel-title">Live Tracking</div>
-                            <div className="live-map">Map Placeholder</div>
+                            <LeafletMap mode="client" clientId={clientId} height={250} />
                             <div className="progress">
                                 <div className="fill" />
                             </div>
@@ -142,6 +159,64 @@ export default function CustomerDashboardPage() {
                                         ))}
                                     </tbody>
                                 </table>
+                            )}
+                        </div>
+
+                        <div className="panel" id="place-order">
+                            <div className="panel-title">Place Order</div>
+                            <p className="text-primary leading-17">Book Truck with Details → Wait for Approval → Rate Discussion → Order Confirmation → Track Ride/Live Updates → Payment and Confirmation.</p>
+                            {!showPlaceOrder && (
+                                <button className="btn-dark" onClick={() => setShowPlaceOrder(true)}>Book Truck</button>
+                            )}
+                            {showPlaceOrder && (
+                                <form className="form-vertical" onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    setPlaceError(null);
+                                    setPlaceSuccess(null);
+                                    if (!supabaseUrl || !supabaseAnonKey) {
+                                        setPlaceError('Supabase env is not configured.');
+                                        return;
+                                    }
+                                    // Allow submission even if client_id is not set; we'll bind to user_id and let RLS policy permit it.
+                                    try {
+                                        setPlacing(true);
+                                        const supabase = createClient();
+                                        const { data: { user } } = await supabase.auth.getUser();
+                                        const payload = {
+                                            user_id: user?.id,
+                                            client_id: clientId ?? null,
+                                            source_city: form.source_city.trim(),
+                                            destination_city: form.destination_city.trim(),
+                                            material: form.material.trim() || null,
+                                            weight_mt: form.weight_mt ? Number(form.weight_mt) : null,
+                                            pickup_date: form.pickup_date || null,
+                                            notes: form.notes.trim() || null,
+                                            status: 'submitted' as const,
+                                        };
+                                        const { error } = await supabase.from('bookings').insert(payload);
+                                        if (error) throw error;
+                                        setPlaceSuccess('Booking submitted! Our team will review and confirm.');
+                                        setForm({ source_city: '', destination_city: '', material: '', weight_mt: '', pickup_date: '', notes: '' });
+                                        setShowPlaceOrder(false);
+                                    } catch (err: any) {
+                                        setPlaceError(err?.message ?? 'Failed to submit booking');
+                                    } finally {
+                                        setPlacing(false);
+                                    }
+                                }}>
+                                    <input className="filter-input" placeholder="Source City" value={form.source_city} onChange={(e) => setForm({ ...form, source_city: e.target.value })} required aria-label="Source City" />
+                                    <input className="filter-input" placeholder="Destination City" value={form.destination_city} onChange={(e) => setForm({ ...form, destination_city: e.target.value })} required aria-label="Destination City" />
+                                    <input className="filter-input" placeholder="Material" value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} aria-label="Material" />
+                                    <input className="filter-input" placeholder="Weight (MT)" type="number" step="0.01" value={form.weight_mt} onChange={(e) => setForm({ ...form, weight_mt: e.target.value })} aria-label="Weight (MT)" />
+                                    <input className="filter-input" placeholder="Pickup Date" type="date" value={form.pickup_date} onChange={(e) => setForm({ ...form, pickup_date: e.target.value })} aria-label="Pickup Date" />
+                                    <input className="filter-input" placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} aria-label="Notes" />
+                                    <div className="row-gap-12">
+                                        <button className="btn-dark" type="submit" disabled={placing}>{placing ? 'Submitting…' : 'Submit Booking'}</button>
+                                        <button className="btn-dark" type="button" onClick={() => { setShowPlaceOrder(false); setPlaceError(null); }}>Cancel</button>
+                                    </div>
+                                    {placeError && <div role="alert">{placeError}</div>}
+                                    {placeSuccess && <div role="status">{placeSuccess}</div>}
+                                </form>
                             )}
                         </div>
 

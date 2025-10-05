@@ -16,6 +16,8 @@ create policy "profiles self read" on profiles
   for select using (auth.uid() = id);
 create policy "profiles self update" on profiles
   for update using (auth.uid() = id);
+create policy "profiles self insert" on profiles
+  for insert with check (auth.uid() = id);
 
 -- clients (admin-managed)
 create table if not exists clients (
@@ -71,6 +73,7 @@ create table if not exists shipments (
   weight_mt numeric,
   status text,
   eta timestamptz,
+  delivered_at timestamptz,
   cost numeric,
   created_at timestamptz default now()
 );
@@ -121,6 +124,11 @@ create policy "telemetry admin read" on telemetry for select using (
   exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
 );
 
+-- Helpful indexes for analytics
+create index if not exists idx_shipments_created_at on shipments(created_at);
+create index if not exists idx_shipments_eta_delivered on shipments(eta, delivered_at);
+create index if not exists idx_telemetry_truck_ts on telemetry(truck_id, ts);
+
 -- dispatch_offers
 create table if not exists dispatch_offers (
   id uuid primary key default gen_random_uuid(),
@@ -152,3 +160,48 @@ alter table notifications enable row level security;
 create policy "notifications self read" on notifications for select using (
   user_id = auth.uid()
 );
+
+-- bookings (client intake)
+create table if not exists bookings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  client_id uuid references clients(id) on delete cascade,
+  source_city text not null,
+  destination_city text not null,
+  material text,
+  weight_mt numeric,
+  pickup_date date,
+  notes text,
+  status text not null default 'submitted' check (status in ('draft','submitted','approved','rejected','in_transit','delivered')),
+  created_at timestamptz default now()
+);
+
+alter table bookings enable row level security;
+
+create policy "bookings admin read" on bookings for select using (
+  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+);
+create policy "bookings client read" on bookings for select using (
+  exists (
+    select 1 from profiles p
+    where p.id = auth.uid()
+      and p.role = 'client'
+      and (
+        (p.client_id is not null and bookings.client_id = p.client_id)
+        or (bookings.user_id = auth.uid())
+      )
+  )
+);
+create policy "bookings client insert" on bookings for insert with check (
+  exists (
+    select 1 from profiles p
+    where p.id = auth.uid()
+      and p.role = 'client'
+      and (
+        (p.client_id is not null and bookings.client_id = p.client_id)
+        or (bookings.user_id = auth.uid())
+      )
+  )
+);
+
+create index if not exists idx_bookings_client_created on bookings(client_id, created_at);

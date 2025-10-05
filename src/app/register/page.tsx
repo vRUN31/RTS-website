@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
+const adminDomains = (process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 
 export default function RegisterPage() {
-	const [role, setRole] = useState<'admin' | 'consumer' | ''>('');
+	const [role, setRole] = useState<'admin' | 'client' | ''>('');
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -28,9 +30,27 @@ export default function RegisterPage() {
 						try {
 							setLoading(true);
 							const supabase = createClient();
-							const { error } = await supabase.auth.signUp({ email, password });
+							// Determine final role by domain; enforce gate if user attempts admin but domain not allowed
+							const emailDomain = email.split('@')[1]?.toLowerCase();
+							const domainSaysAdmin = !!emailDomain && adminDomains.includes(emailDomain);
+							const emailExplicitAdmin = adminEmails.includes(email.toLowerCase());
+							if (role === 'admin' && !(domainSaysAdmin || emailExplicitAdmin)) {
+								throw new Error('Admin signup is restricted to approved email domains.');
+							}
+							const { data, error } = await supabase.auth.signUp({ email, password });
 							if (error) throw error;
-							window.location.href = role === 'admin' ? '/admin' : '/dashboard/customer';
+							const userId = data.user?.id;
+							if (userId) {
+								const finalRole = (domainSaysAdmin || emailExplicitAdmin) ? 'admin' : 'client';
+								await supabase
+									.from('profiles')
+									.upsert({ id: userId, role: finalRole })
+									.throwOnError();
+								window.location.href = finalRole === 'admin' ? '/admin' : '/dashboard/customer';
+							} else {
+								// Email confirmation flow: show message and redirect to login
+								window.location.href = '/login';
+							}
 						} catch (err: any) {
 							setError(err?.message ?? 'Sign up failed');
 						} finally {
@@ -44,7 +64,6 @@ export default function RegisterPage() {
 						<input className="input-text flex-1" required placeholder="Last Name*" />
 					</div>
 					<input className="input-text" required type="email" placeholder="Email*" value={email} onChange={e=>setEmail(e.target.value)} />
-					<input className="input-text" required placeholder="Company Name (only for employees&HR)" />
 					<input className="input-text" required placeholder="Username*" />
 					<input className="input-text" required type="password" placeholder="Password*" value={password} onChange={e=>setPassword(e.target.value)} />
 					<input className="input-text" required type="password" placeholder="Confirm Password*" />
@@ -53,8 +72,8 @@ export default function RegisterPage() {
 						<label className={`pill ${role==='admin' ? 'is-active' : ''}`}>
 							<input className="radio-hidden" type="radio" name="role" value="admin" required checked={role==='admin'} onChange={() => setRole('admin')} /> Admin
 						</label>
-						<label className={`pill ${role==='consumer' ? 'is-active' : ''}`}>
-							<input className="radio-hidden" type="radio" name="role" value="consumer" checked={role==='consumer'} onChange={() => setRole('consumer')} /> Consumer
+						<label className={`pill ${role==='client' ? 'is-active' : ''}`}>
+							<input className="radio-hidden" type="radio" name="role" value="client" checked={role==='client'} onChange={() => setRole('client')} /> Client
 						</label>
 					</div>
 					{error && <div className="text-center text-dim" role="alert">{error}</div>}
