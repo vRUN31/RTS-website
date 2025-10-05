@@ -10,7 +10,20 @@ Next.js App Router app with Supabase for auth and data. Static HTML prototypes r
     - `NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS` (comma-separated domains allowed to sign up/login as admin; e.g., `rts.co.in,example.com`)
     - `NEXT_PUBLIC_ADMIN_EMAILS` (comma-separated explicit admin emails; e.g., `chopadeshyam8@gmail.com,owner@rts.co.in`)
 2. Install deps
-3. Start dev server
+3. Install deps:
+
+    npm install
+
+4. Start dev server (PowerShell / CMD on Windows):
+
+    npm run dev
+
+    - The Next.js dev server will attempt to use port 3000 by default. If port 3000 is occupied the server will automatically pick the next available port (for example 3001). The terminal log will show which port it's using.
+
+5. Quick test notes
+
+- To test the static HTML prototypes open `src/Dasboard/customer.html` and `src/login and reg/*.html` directly in your browser or serve them via the dev server while you iterate.
+- Guest mode: append `?guest=true` to dashboard URLs to simulate a guest user. The Book Truck flow will show an in-UI dialog preventing booking for guests.
 
 ## Supabase setup (optional but recommended)
 

@@ -26,10 +26,12 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     }
     // Date range and grain controls
     const now = new Date();
-    const range = (typeof searchParams?.range === 'string' ? searchParams?.range : 'month') as 'hour'|'day'|'month'|'year';
-    const grain = (typeof searchParams?.grain === 'string' ? searchParams?.grain : range) as 'hour'|'day'|'month'|'year';
-    const startParam = typeof searchParams?.start === 'string' ? searchParams?.start : undefined;
-    const endParam = typeof searchParams?.end === 'string' ? searchParams?.end : undefined;
+    // `searchParams` may be a dynamic/special object in Next; await it first per Next.js guidance
+    const params = (await (searchParams as unknown)) as Record<string, string | string[] | undefined> | undefined;
+    const range = (typeof params?.range === 'string' ? params?.range : 'month') as 'hour'|'day'|'month'|'year';
+    const grain = (typeof params?.grain === 'string' ? params?.grain : range) as 'hour'|'day'|'month'|'year';
+    const startParam = typeof params?.start === 'string' ? params?.start : undefined;
+    const endParam = typeof params?.end === 'string' ? params?.end : undefined;
     const endDate = endParam ? new Date(endParam) : now;
     const startDate = startParam ? new Date(startParam) : new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
@@ -184,80 +186,85 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
     return (
         <main className="dashboard-container">
-            <h1 className="panel-title">Admin Dashboard</h1>
-
-            {/* Quick filters and actions */}
-            <div className="row-between mt-16">
-                <div className="row-gap-12">
-                    <a className="btn-dark" href={`/admin?range=hour&grain=hour`}>Last Hour</a>
-                    <a className="btn-dark" href={`/admin?range=day&grain=day`}>Last Day</a>
-                    <a className="btn-dark" href={`/admin?range=month&grain=month`}>Last 6 Months</a>
-                    <a className="btn-dark" href={`/admin?range=year&grain=month`}>Year to Date</a>
+            <div className="row-between">
+                <div>
+                    <h1 className="title">Admin Dashboard</h1>
+                    <p className="subtitle">Overview of fleet, shipments, and operational KPIs</p>
                 </div>
                 <div className="row-gap-12">
-                    <a className="btn-dark" href={`/contracts`}>Create Contract</a>
-                    <a className="btn-dark" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`}>Export Shipments CSV</a>
+                    <a className="cta-ghost" href={`/contracts`}>Create Contract</a>
+                    <a className="cta-ghost" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`}>Export CSV</a>
                 </div>
             </div>
 
-            {/* Date range picker */}
-            <form className="row-gap-12 mt-12" action="/admin" method="get">
-                <input type="hidden" name="grain" value={grain} />
-                <label>
-                    Start:
-                    <input className="input" type="datetime-local" name="start" defaultValue={toLocalInputValue(startDate)} />
-                </label>
-                <label>
-                    End:
-                    <input className="input" type="datetime-local" name="end" defaultValue={toLocalInputValue(endDate)} />
-                </label>
-                <button className="btn-dark" type="submit">Apply</button>
-            </form>
+            <div className="mt-16 row-between">
+                <div className="row-gap-12">
+                    <a className="pill" href={`/admin?range=hour&grain=hour`}>Last Hour</a>
+                    <a className="pill" href={`/admin?range=day&grain=day`}>Last Day</a>
+                    <a className="pill" href={`/admin?range=month&grain=month`}>Last 6 Months</a>
+                    <a className="pill" href={`/admin?range=year&grain=month`}>Year to Date</a>
+                </div>
+                <form className="row-gap-12" action="/admin" method="get" style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                    <input type="hidden" name="grain" value={grain} />
+                    <label className="text-muted">
+                        Start:
+                        <input className="input-text" type="datetime-local" name="start" defaultValue={toLocalInputValue(startDate)} />
+                    </label>
+                    <label className="text-muted">
+                        End:
+                        <input className="input-text" type="datetime-local" name="end" defaultValue={toLocalInputValue(endDate)} />
+                    </label>
+                    <button className="btn-dark" type="submit">Apply</button>
+                </form>
+            </div>
 
+            {/* KPI Panels */}
             <section className="grid-3 mt-16">
-                <div className="panel">
+                <div className="panel card">
                     <div className="panel-title">Trucks</div>
                     <div className="dashboard-header">{trucksCount ?? '—'}</div>
                 </div>
-                <div className="panel">
+                <div className="panel card">
                     <div className="panel-title">Shipments</div>
                     <div className="dashboard-header">{shipmentsCount ?? '—'}</div>
                 </div>
-                <div className="panel">
+                <div className="panel card">
                     <div className="panel-title">Contracts</div>
                     <div className="dashboard-header">{contractsCount ?? '—'}</div>
                 </div>
             </section>
 
             <section className="grid-3 mt-16">
-                <div className="panel">
+                <div className="panel card">
                     <div className="panel-title">On-time Delivery %</div>
                     <div className="dashboard-header">{Number.isFinite(onTimePct) ? `${onTimePct}%` : '—'}</div>
                 </div>
-                <div className="panel">
+                <div className="panel card">
                     <div className="panel-title">Avg Speed (km/h)</div>
                     <div className="dashboard-header">{Number.isFinite(avgSpeedKph) ? avgSpeedKph : '—'}</div>
                 </div>
-                <div className="panel">
+                <div className="panel card">
                     <div className="panel-title">Idling Hours</div>
                     <div className="dashboard-header">{Number.isFinite(idlingHours) ? idlingHours : '—'}</div>
                 </div>
             </section>
 
-            <div className="mt-16">
+            <div className="mt-16 card">
                 <LeafletMap mode="admin" height={420} />
             </div>
 
             {/* Analytics & Charts */}
-            <AdminAnalytics
-                shipmentsStatusCounts={shipmentsStatusCounts}
-                shipmentsPerMonth={shipmentsPerMonth}
-                distancePerMonth={distancePerMonth}
-                revenuePerMonth={revenuePerMonth}
-                trucksByStatus={trucksByStatus}
-            />
+            <div className="mt-16">
+                <AdminAnalytics
+                    shipmentsStatusCounts={shipmentsStatusCounts}
+                    shipmentsPerMonth={shipmentsPerMonth}
+                    distancePerMonth={distancePerMonth}
+                    revenuePerMonth={revenuePerMonth}
+                    trucksByStatus={trucksByStatus}
+                />
+            </div>
 
-            <section className="panel mt-16">
+            <section className="panel card mt-16">
                 <div className="panel-title">Recent Shipments</div>
                 <table className="table">
                     <thead>
