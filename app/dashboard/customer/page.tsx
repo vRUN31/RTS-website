@@ -1,4 +1,4 @@
-export { default } from '../../../../src/app/dashboard/customer/page';
+export { default } from '@/src/app/dashboard/customer/page';
 
 
 

@@ -1,8 +1,6 @@
 # AI agent instructions for RTS-website
 
-This repo is a static HTML prototype for a transport logistics website (Raj Mohan Transport Services). There is no configured backend; flows are client-side and use placeholder data. The `package.json` lists React/Next scripts but no React app exists in `src`—treat this as a static site unless we explicitly migrate.
-
-We are beginning integration with Supabase for authentication, database (tables, storage), and realtime where applicable. Until a full migration, wire minimal supabase-js calls from static pages, keeping secrets out of the client.
+This repo contains a Next.js App Router app (TypeScript) under `src/app` and legacy static HTML prototypes under `src/Dasboard` and `src/login and reg` (kept for reference). The canonical app is the Next.js one. We integrate Supabase for authentication, database (tables, storage), and realtime.
 
 ## Big picture
 - Entry: `src/login and reg/home.html` (landing with Sign Up, Login, Guest).
@@ -11,41 +9,50 @@ We are beginning integration with Supabase for authentication, database (tables,
 - Forgot password: `src/login and reg/forgot_password.html` mocks email/OTP flow client-side.
 
 ## Run & debug
-- Ignore `react-scripts`/`next` in `package.json` for now. Serve statically (VS Code Live Server or any static server) from repo root or `src/`.
-- Paths are relative across `src/login and reg` and `src/Dasboard`; keep the space and misspelling consistent.
-- Use browser devtools; there are no tests.
+- Use `npm run dev` (Turbopack enabled) to run Next.js locally.
+- Env vars in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Top-level `app/*` shims re-export from `src/app/*` to keep routes stable.
 
-### Supabase quickstart (prototype)
-- Create a tiny `src/config/supabase.js` that exports a Supabase client via the public URL + anon key read from a single config file (do NOT hardcode in pages). Example usage pattern in pages: import the client and call `supabase.auth.signInWithPassword(...)`.
-- For purely static hosting, inline type="module" scripts may import `./config/supabase.js` relatively.
-- Never commit service_role keys; only client anon keys may be referenced by the browser.
+### Supabase quickstart
+- Use the shared helpers: `@/utils/supabase/client` for client components and `@/utils/supabase/server` for SSR components. Do not hardcode keys in pages.
+- Store only the anon key in the browser; never expose service_role.
 
 ## Conventions
-- Styling lives in a `<style>` tag per page; brand color `#ff4d00`, backgrounds `#dedede`/`#f6f6f6`; fonts via Google Fonts (Cinzel, Playfair Display); Font Awesome via CDN.
-- Page transitions: each page defines `.page-transition` and `handlePageTransition(url)`. Replace inline `onclick` navigations with event listeners calling `handlePageTransition`.
-- Guest mode: `customer.html` shows Login/Register only if URL has `?guest=true`. Preserve this param when navigating from home.
-- Reuse navbar/header/footer patterns from `customer.html` for new pages.
+- Styling is centralized in `src/app/globals.css` (brand `#ff4d00`, backgrounds `#dedede`/`#f6f6f6`, fonts Cinzel/Playfair Display). Avoid inline styles.
+- Client pages use a small `Effects` component for page transitions.
+- Preserve `?guest=true` across routes in customer flows when applicable.
 
-### Supabase conventions (prototype)
-- Centralize config: `src/config/supabase.js` (or `.ts` if we later migrate). Provide a single `getSupabaseClient()`.
-- Auth flow: replace `dummyUsers` in `login.html` with `supabase.auth.signInWithPassword({ email, password })`. On success, route by role (admin/client) stored on the user’s profile table.
-- User profile/role: store role in a `profiles` table keyed by `auth.users.id`. Read it after login and redirect accordingly.
-- Password reset: replace the mocked OTP in `forgot_password.html` with `supabase.auth.resetPasswordForEmail(email, { redirectTo: <site-url>/reset })`.
+### Supabase conventions
+- Auth: use `supabase.auth.signInWithPassword` and then read `profiles.role` to route admin → `/admin`, client → `/dashboard/customer`.
+- Profiles: `profiles` keyed by `auth.users.id`, with `role in ('admin','client')` and optional `client_id`.
+- Password reset: `supabase.auth.resetPasswordForEmail(email, { redirectTo: <site-url>/reset })`.
 
-## Adding features/pages
-- Admin area: add `src/Dasboard/admin.html` mirroring `customer.html`; change `login.html` to route admins there.
-- Contracts: create `src/Dasboard/contracts.html`; add a left-panel or navbar link in admin and route with the transition helper.
-- Map: replace the `.live-map` placeholder with a real map SDK when integrating tracking.
+## Adding features/pages (Next.js)
+- Admin area: `src/app/admin/page.tsx`.
+- Contracts: `src/app/contracts/page.tsx` backed by Supabase `contracts` with active/expired filters.
+- Customer dashboard: `src/app/dashboard/customer/page.tsx` backed by `shipments` with filters.
+- Map: replace `.live-map` with a real map (Leaflet/MapLibre) as a client component.
 
 Supabase-backed features (incremental):
-- Contracts list/detail: fetch from `contracts` table; filter by active/expired. Use RLS to restrict visibility.
-- Orders/Shipments table: back `orders table` in `customer.html` with `shipments` table. Add lightweight fetch & render.
-- Realtime: optional; subscribe to `trucks`/`telemetry` with Supabase Realtime channels to update live map.
+- Live GPS/Telemetry: `trucks` and `telemetry` tables; subscribe to realtime topics for map updates.
+- Contracts list/detail: fetch from `contracts`, filter active/expired, RLS per client.
+- Shipments: back orders table with `shipments`, scoped by `profiles.client_id`.
+- Realtime: subscribe to `notifications` for in-app updates.
+
+Client intake and approvals
+- Add a booking form (source, destination, weight, material, pickup date, duration, notes) with vehicle recommendation by weight/capacity.
+- Admin reviews and approves bookings → convert to `shipments` and notify client.
+
+Routing and ETA
+- Use routing algorithms/APIs (OSRM/Mapbox/Google) for route choices, distances, ETA, and optionally tolls.
+
+Analytics
+- Date-range filters; charts for trucks (fuel, halts, distances, speeds), locations (top origins/destinations, route choices), and clients (volume, revenue).
 
 ## Integration points (future-ready)
 - GPS: Poll/subscribe to `/api/trucks/:id/location` for status (running/halt/speed) and show on the map with badges.
 - Analytics: Add date-range filters (hours/days/months/years) and charts (fuel, halts, breakdowns, distance, speed, geo segments) via a CDN chart lib (e.g., Chart.js).
-- Routing: Provide multiple route options and ETA/cost using a pathfinding algorithm service; encapsulate behind a module/API call.
+- Routing: Provide multiple route options and ETA/cost using a pathfinding algorithm service; encapsulate behind a module/API call. Respect vehicle class constraints.
 - Security: No secrets or real credentials in client. Centralize future API base URLs in a config and use secure auth when backend exists.
 
 Supabase-specific
@@ -53,12 +60,12 @@ Supabase-specific
 - Secrets: store the Supabase URL and anon key in an environment-specific config not checked into VCS (or a single `config.example.js` with placeholders). For static hosting, instruct deploy platform to inject runtime config if possible.
 
 ## Examples in code
-- Home guest button -> `../Dasboard/customer.html?guest=true` via `handlePageTransition`.
-- Login success -> `../Dasboard/customer.html` after checking `dummyUsers`.
-- Transition rewiring: `home.html` converts `button[onclick]` to event listeners calling `handlePageTransition`.
+- Login success → route by `profiles.role`.
+- Contracts page → reads from Supabase with Active/Expired filter.
+- Customer dashboard → reads shipments scoped by `profiles.client_id`.
 
 ## Pitfalls
-- Relative links must account for space in `login and reg` and misspelling `Dasboard`.
-- `npm start` won’t work as a React app until we migrate; serve statically instead.
+- Keep alias imports stable (`@/*` → repo root). Top-level `app/*` must only re-export from `src/app/*`.
+- Avoid inline secrets; never commit service_role.
 
 If a request conflicts with current patterns (e.g., renaming folders), propose minimal, consistent changes and ask for confirmation before large refactors.

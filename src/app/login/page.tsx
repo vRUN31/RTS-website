@@ -24,9 +24,21 @@ export default function LoginPage() {
 		try {
 			setLoading(true);
 			const supabase = createClient();
-			const { error } = await supabase.auth.signInWithPassword({ email, password });
+			const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
 			if (error) throw error;
-			window.location.href = role === 'admin' ? '/admin' : '/dashboard/customer';
+			// Fetch profile to determine role if available
+			const userId = signInData?.user?.id;
+			let target = role === 'admin' ? '/admin' : '/dashboard/customer';
+			if (userId) {
+				const { data: profile } = await supabase
+					.from('profiles')
+					.select('role')
+					.eq('id', userId)
+					.maybeSingle();
+				if (profile?.role === 'admin') target = '/admin';
+				if (profile?.role === 'client') target = '/dashboard/customer';
+			}
+			window.location.href = target;
 		} catch (err: any) {
 			setError(err?.message ?? 'Login failed');
 		} finally {
