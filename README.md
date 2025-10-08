@@ -1,6 +1,28 @@
 # Raj Mohan Transport Services (RTS)
 
-Next.js App Router app with Supabase for auth and data. Static HTML prototypes remain under `src/Dasboard` and `src/login and reg` for reference while we migrate.
+Next.js 15 App Router application with Supabase for authentication and data management. Features role-based access control, live GPS tracking, and analytics dashboard for transport logistics management.
+
+## Current Status (October 2025)
+
+**✅ Completed MVP Features:**
+- Next.js 15 App Router with TypeScript and Supabase integration
+- Authentication system with role-based routing (admin/client)
+- Admin dashboard with live fleet map, KPI cards, and analytics
+- Customer dashboard with shipment tracking and limited map view
+- Contracts management with Active/Expired filtering
+- CSV export functionality for shipments
+- Responsive UI with conditional navigation (TopShell component)
+- Enhanced logout with proper backend synchronization
+- Leaflet.js integration for live GPS tracking
+- Real-time updates via Supabase Realtime
+
+**🔧 Recent Fixes:**
+- Next.js 15 compatibility for async searchParams
+- Conditional header rendering (hidden on home, register, admin routes)
+- Improved logout flow with proper state clearing and home redirect
+- Build stability and error handling improvements
+
+Static HTML prototypes remain under `src/Dasboard` and `src/login and reg` for reference during migration.
 
 ## Quick start
 
@@ -61,17 +83,36 @@ GPS hardware adapter
 - Implement a small adapter (server-side service or edge function) that receives data from your GPS hardware (polling API or webhook) and writes into the Supabase `telemetry` table.
 - Link your trucks in the `trucks` table (plate, model, device_id) and associate shipments with `truck_id` to enable client map visibility.
 
-## Notes
+## Architecture Notes
 
-- The top-level `app/` directory re-exports pages from `src/app/` to keep legacy routes working.
-- Avoid committing service_role keys. Only use the anon key in the browser.
+- **Next.js 15 Compatibility**: Updated for async searchParams and latest React 18 patterns
+- **Conditional Navigation**: TopShell component provides selective header rendering based on route
+- **File Structure**: Top-level `app/` directory re-exports pages from `src/app/` to maintain route stability
+- **Security**: Avoid committing service_role keys. Only use the anon key in the browser
+- **State Management**: Enhanced logout with proper Supabase state synchronization
+
+## Development Roadmap
+
+**🚧 Pending Implementation:**
+- Complete Supabase schema deployment with RLS policies
+- GPS hardware adapter for real telemetry ingestion
+- Driver management and dispatch system
+- Consumer booking with vehicle recommendation
+- Advanced analytics and reporting features
+- Routing algorithms and ETA calculations
+- In-app notification system
+- Document management and storage
+- Communication features (chat, calls)
 
 ## Troubleshooting
 
-- Missing env: Pages will fall back to placeholders; set `.env.local` to enable live data.
-- Auth login succeeds but no redirect: Ensure `profiles.role` exists for the user.
-- Dashboard shows no shipments: Ensure `profiles.client_id` is set and there are rows in `shipments` with that `client_id`.
-- Map not rendering: verify Leaflet CSS is loaded in `src/app/layout.tsx` and that env vars are set so the component can query Supabase.
-- No real-time updates: confirm the adapter is inserting into `telemetry` and that Supabase Realtime is enabled for the project.
-- RLS error inserting profile: make sure the `profiles` table has a self-insert policy:
+- **Build errors**: Recent Next.js 15 compatibility issues have been resolved for searchParams
+- **Missing env**: Pages will fall back to placeholders; set `.env.local` to enable live data
+- **Auth login succeeds but no redirect**: Ensure `profiles.role` exists for the user
+- **Dashboard shows no shipments**: Ensure `profiles.client_id` is set and there are rows in `shipments` with that `client_id`
+- **Map not rendering**: Verify Leaflet CSS is loaded in `src/app/layout.tsx` and that env vars are set so the component can query Supabase
+- **No real-time updates**: Confirm the adapter is inserting into `telemetry` and that Supabase Realtime is enabled for the project
+- **RLS error inserting profile**: Make sure the `profiles` table has a self-insert policy:
     - `create policy "profiles self insert" on profiles for insert with check (auth.uid() = id);`
+- **Logout not redirecting**: Enhanced logout now properly clears state and redirects to home page
+- **Header showing on landing pages**: TopShell component now conditionally hides navigation on home, register, and admin routes

@@ -4,7 +4,7 @@ import { createClient as createServerSupabase } from '@/utils/supabase/server';
 import LeafletMap from '@/src/components/map/LeafletMap.client';
 import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
 
-export default async function AdminDashboard({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
+export default async function AdminDashboard({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
     // SSR guard: only admins may access
     const cookieStore = await cookies();
     const supabase = createServerSupabase(cookieStore as any);

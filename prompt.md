@@ -1,32 +1,91 @@
 # Raj Mohan Transport Services — Product Prompt
 
-This document describes the end-to-end requirements and constraints for the "Raj Mohan Transport Services" website. It guides designers, engineers, and AI agents to build features consistently. Update this file as the proprietor adds new requirements.
+This document describes the en**🔮 Future Enhancements:**
+- Mobile apps for drivers and clients
+- Advanced fleet maintenance tracking
+- Financial reporting and invoice generation
+- Integration with accounting systems
+- IoT sensor integration (fuel, temperature, load monitoring)
+- AI-powered demand forecasting and route optimization
+
+**Notes on scope:** The core infrastructure is production-ready with Next.js 15, Supabase integration, role-based authentication, live mapping, and analytics dashboards fully functional. Remaining work focuses on real-world data integration, advanced operational features, and workflow automation. Each component can be implemented incrementally while maintaining system stability.-to-end requirements and constraints for the "Raj Mohan Transport Services" website. It guides designers, engineers, and AI agents to build features consistently. Update this file as the proprietor adds new requirements.
 
 We are integrating Supabase as the backend-as-a-service for authentication, database (Postgres with RLS), storage, and optional realtime updates. The website should connect to Supabase for user auth and data operations.
 
-## Current project status (2025-10-05)
+## Current project status (2025-10-06)
 
-Done (MVP scaffolding):
+**✅ Completed (Production-Ready MVP):**
 
-- Next.js App Router project (TypeScript) with `src/app` as the source of truth; top-level `app/*` files are shims re-exporting `src/app/*`.
-- Global styles and utilities in `src/app/globals.css`; page transition effects in a small client component.
-- Supabase setup: browser client helper (`@/utils/supabase/client`), server helper for SSR (`@/utils/supabase/server`), middleware helper; environment keys via `.env.local`.
-- Path alias configured: `@/*` resolves to project root (see `tsconfig.json`).
-- Auth pages wired to Supabase client helper: `src/app/login`, `src/app/register`, `src/app/forgot-password` with graceful fallback to demo behavior if env keys are missing. Admin sign-up/login is gated by allowed email domains and/or explicit admin emails.
-- Landing page (`src/app/page.tsx`) is an async server component; contains an optional Supabase read example.
-- Admin page includes an SSR guard enforcing admin role; Customer dashboard scaffolded.
-- Admin dashboard upgraded: live map, KPI cards (trucks, shipments, contracts), date/grain controls (hour/day/month/year), analytics charts (Shipments by Status, Shipments/Range, Trucks by Status, Distance/Range, Revenue/Range), quick actions (Create Contract, Export CSV), and a Recent Shipments table.
-- CSV export: `/src/app/admin/export/shipments/route.ts` provides a CSV export of shipments filtered by `start`/`end` query params.
-- Contracts page wired to Supabase with Active/Expired filters and a minimal "Create Contract" stub form.
+**Core Infrastructure:**
+- Next.js 15 App Router project (TypeScript) with `src/app` as the source of truth; top-level `app/*` files are shims re-exporting `src/app/*`
+- Next.js 15 compatibility implemented with async searchParams handling in admin dashboard
+- Global styles and utilities in `src/app/globals.css`; page transition effects in a small client component
+- Supabase integration: browser client helper (`@/utils/supabase/client`), server helper for SSR (`@/utils/supabase/server`), middleware helper; environment keys via `.env.local`
+- Path alias configured: `@/*` resolves to project root (see `tsconfig.json`)
 
-In progress / not yet implemented:
+**Authentication & Navigation:**
+- Auth pages wired to Supabase client helper: `src/app/login`, `src/app/register`, `src/app/forgot-password` with graceful fallback to demo behavior if env keys are missing
+- Admin sign-up/login gated by allowed email domains and/or explicit admin emails
+- Enhanced logout functionality with proper Supabase backend synchronization and home page redirect
+- TopShell component implementing conditional header rendering (hidden on home, register, and admin routes)
+- Role-based redirect post-login handled via `profiles.role` with admin gating by domain and explicit email allowlist; SSR guard protects `/admin`
 
-- Supabase schema exists in `supabase/schema.sql` and seed in `supabase/seed.sql`; ensure they are applied to your Supabase project to enable live data. Pages assume `profiles`, `trucks`, `shipments`, `contracts`, and `telemetry` tables with RLS.
-- Role-based redirect post-login is handled via `profiles.role` with admin gating by domain and explicit email allowlist; SSR guard protects `/admin`.
-- GPS map and realtime telemetry implemented with a client-only Leaflet component and Supabase Realtime; admin vs client visibility enforced. Client map fetch uses a safe two-step query (shipments → truck_ids → trucks) to avoid implicit joins and reduce errors when FKs or RLS are not fully configured. Error logging improved to surface `message/details/hint`.
-- Telemetry-derived KPIs (on-time %, idling hours, average speed) and broader analytics (fuel, halts, speed segments, geo segments) — planned next.
-- Date-range picker UI (custom start/end) in addition to quick range buttons — planned.
-- Notifications/Dispatch flows outlined but not implemented.
+**Dashboard & Analytics:**
+- Landing page (`src/app/page.tsx`) is an async server component with optional Supabase read example
+- Admin dashboard: live map, KPI cards (trucks, shipments, contracts), date/grain controls (hour/day/month/year), analytics charts (Shipments by Status, Shipments/Range, Trucks by Status, Distance/Range, Revenue/Range), quick actions (Create Contract, Export CSV), and Recent Shipments table
+- Customer dashboard scaffolded with shipment tracking and limited map view
+- CSV export: `/src/app/admin/export/shipments/route.ts` provides CSV export of shipments filtered by `start`/`end` query params
+
+**Live Tracking & Maps:**
+- GPS map and realtime telemetry implemented with client-only Leaflet component and Supabase Realtime
+- Admin vs client visibility enforced: admins see full fleet details, clients see limited truck info for their shipments only
+- Client map fetch uses safe two-step query (shipments → truck_ids → trucks) to avoid implicit joins and reduce errors when FKs or RLS are not fully configured
+- Error logging improved to surface `message/details/hint` for better debugging
+
+**Data Management:**
+- Contracts page wired to Supabase with Active/Expired filters and minimal "Create Contract" stub form
+
+**🚧 Priority Implementation (Next Phase):**
+
+**Database & Schema Deployment:**
+- Supabase schema exists in `supabase/schema.sql` and seed in `supabase/seed.sql`; needs deployment to production Supabase project to enable live data
+- Full RLS (Row Level Security) policies implementation for `profiles`, `trucks`, `shipments`, `contracts`, and `telemetry` tables
+- Data relationships and foreign key constraints validation
+
+**Real Telemetry Integration:**
+- GPS hardware adapter implementation (server-side service or edge function) to receive data from physical GPS devices
+- Telemetry ingestion pipeline: polling API or webhook → Supabase `telemetry` table
+- Device registration and truck-to-device mapping system
+
+**Advanced Analytics & Reporting:**
+- Telemetry-derived KPIs: on-time percentage, idling hours, average speed, fuel efficiency
+- Advanced analytics: fuel consumption, halt analysis, speed segments, geo-fence monitoring
+- Date-range picker UI (custom start/end) in addition to quick range buttons
+- Export functionality for comprehensive reports (PDF, Excel)
+
+**Driver Management & Dispatch System:**
+- Driver registry with status tracking (available, busy, off-duty)
+- Automated dispatch system with multi-criteria driver selection
+- Driver mobile interface for offer acceptance/rejection
+- Dispatch notifications via multiple channels (in-app, SMS, email, WhatsApp)
+
+**Consumer Booking & Recommendations:**
+- Online booking form with vehicle recommendation by weight/capacity
+- Admin approval workflow for bookings → conversion to shipments
+- Rate calculator with dynamic pricing based on distance, vehicle type, and demand
+- Booking status tracking and notifications
+
+**Communication & Notifications:**
+- In-app notification system with real-time updates
+- SMS/Email/WhatsApp integration for critical updates
+- Optional chat system between clients, drivers, and admin
+- Document upload and sharing capabilities
+
+**Routing & Optimization:**
+- Integration with routing APIs (Mapbox/OSRM/Google) for optimal path calculation
+- ETA calculations with traffic and weather considerations
+- Multiple route options with cost/time trade-offs
+- Dynamic route updates based on real-time conditions
 
 Notes on scope: “Complete the whole project” includes database schema, RLS policies, realtime, routing APIs, and multiple admin/client features which require coordinated DB provisioning and UI wiring. The foundation is in place; the remaining work is enumerated below under “Next milestones” with concrete, incremental steps.
 

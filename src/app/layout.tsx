@@ -6,8 +6,8 @@ import TopBar from './_topbar.client';
 import HideableTopBar from './_hideable-topbar.client';
 
 export const metadata: Metadata = {
-	title: 'Raj Mohan Transport Services',
-	description: 'Transport logistics platform',
+    title: 'Raj Mohan Transport Services',
+    description: 'Transport logistics platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

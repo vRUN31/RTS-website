@@ -53,7 +53,7 @@ Analytics
 
 ## Integration points (future-ready)
 - GPS: Poll/subscribe to `/api/trucks/:id/location` for status (running/halt/speed) and show on the map with badges.
-	- Adapter: a small process receives GPS hardware updates (polling/webhook) and writes to `telemetry(truck_id, ts, lat, lng, speed, status)`. UI listens on Supabase Realtime INSERT and moves markers.
+    - Adapter: a small process receives GPS hardware updates (polling/webhook) and writes to `telemetry(truck_id, ts, lat, lng, speed, status)`. UI listens on Supabase Realtime INSERT and moves markers.
 - Analytics: Add date-range filters (hours/days/months/years) and charts (fuel, halts, breakdowns, distance, speed, geo segments) via a CDN chart lib (e.g., Chart.js).
 - Routing: Provide multiple route options and ETA/cost using a pathfinding algorithm service; encapsulate behind a module/API call. Respect vehicle class constraints.
 - Security: No secrets or real credentials in client. Centralize future API base URLs in a config and use secure auth when backend exists.

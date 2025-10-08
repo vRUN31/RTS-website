@@ -104,8 +104,25 @@ export default function UserMenu() {
             </>
           )}
           <button className="dropdown-item danger" role="menuitem" onClick={async () => {
-            await supabase.auth.signOut();
-            router.push('/login');
+            try {
+              // Sign out from Supabase backend
+              await supabase.auth.signOut();
+              
+              // Clear local state immediately to prevent UI inconsistency
+              setEmail(null);
+              setProfile(null);
+              setOpen(false);
+              
+              // Force redirect to home page
+              window.location.href = '/';
+            } catch (error) {
+              console.error('Logout error:', error);
+              // Even if logout fails, clear local state and redirect
+              setEmail(null);
+              setProfile(null);
+              setOpen(false);
+              window.location.href = '/';
+            }
           }}>Logout</button>
         </div>
       )}
