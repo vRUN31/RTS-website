@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import dynamic from 'next/dynamic';
+import styles from './dashboard.module.css';
 
 const LeafletMap = dynamic(() => import('@/src/components/map/LeafletMap.client'), { ssr: false });
 
@@ -39,6 +40,8 @@ export default function CustomerDashboardPage() {
     const [reloadBookings, setReloadBookings] = useState(0);
     const [placing, setPlacing] = useState(false);
     const [showPlaceOrder, setShowPlaceOrder] = useState(false);
+    const [guestMode, setGuestMode] = useState(false);
+    const [showGuestModal, setShowGuestModal] = useState(false);
     const [placeError, setPlaceError] = useState<string | null>(null);
     const [placeSuccess, setPlaceSuccess] = useState<string | null>(null);
     const [form, setForm] = useState({
@@ -100,6 +103,14 @@ export default function CustomerDashboardPage() {
             mounted = false;
         };
     }, [supabaseUrl, supabaseAnonKey]);
+
+    // detect guest=true in URL
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            setGuestMode(params.get('guest') === 'true');
+        } catch { /* ignore */ }
+    }, []);
 
     // Load bookings for this user/client
     useEffect(() => {
@@ -163,10 +174,31 @@ export default function CustomerDashboardPage() {
         <>
             <main className="dashboard-container">
                 <div className="dashboard-header mb-18">Welcome to RAJMOHAN TRANSPORT SERVICES</div>
+
+                {/* KPI Row */}
+                <div className={`${styles.kpiRow} mb-18`}>
+                    <div className={`${styles.kpi} card`}>
+                        <div className={styles.kpiTitle}>Active Shipments</div>
+                        <div className={styles.kpiValue}>{rows.filter(r => (r.status ?? '').toLowerCase() === 'in_transit').length}</div>
+                    </div>
+                    <div className={`${styles.kpi} card`}>
+                        <div className={styles.kpiTitle}>Pending Bookings</div>
+                        <div className={styles.kpiValue}>{bookings.filter(b => (b.status ?? '').toLowerCase() === 'submitted').length}</div>
+                    </div>
+                    <div className={`${styles.kpi} card`}>
+                        <div className={styles.kpiTitle}>Avg Delivery Time</div>
+                        <div className={styles.kpiValue}>2h 15m</div>
+                    </div>
+                    <div className={`${styles.kpi} card`}>
+                        <div className={styles.kpiTitle}>Revenue (Est.)</div>
+                        <div className={styles.kpiValue}>₹{rows.reduce((s, r) => s + (typeof r.cost === 'number' ? r.cost : 0), 0).toLocaleString('en-IN')}</div>
+                    </div>
+                </div>
+
                 <div className="grid-2-1">
                     {/* suppress hydration mismatches from password manager/browser extensions injecting attributes */}
                     <section suppressHydrationWarning>
-                            <div className="panel" id="tracking">
+                            <div className={`panel ${styles.panelCenter}`} id="tracking">
                             <div className="panel-title">Live Tracking</div>
                             <LeafletMap mode="client" clientId={clientId} height={250} />
                             <div className="progress">
@@ -175,7 +207,7 @@ export default function CustomerDashboardPage() {
                             <div className="eta">ETA: 2 hrs 15 min</div>
                         </div>
 
-                        <div className="panel" id="shipments">
+                        <div className={`panel ${styles.panelCenter}`} id="shipments">
                             <div className="panel-title">Shipments</div>
                             <div className="text-primary leading-17 mb-18">Delivered or in-progress shipments created after booking approvals.</div>
                             <div className="row-gap-12">
@@ -187,11 +219,12 @@ export default function CustomerDashboardPage() {
                                     <option value="delivered">Delivered</option>
                                 </select>
                             </div>
-                            {loading && <div>Loading…</div>}
+                            {loading && <div className="muted-small">Loading…</div>}
                             {error && (
-                                <div role="alert">{error}</div>
+                                <div role="alert" className="muted-small">{error}</div>
                             )}
                             {!loading && !error && (
+                                <div className={styles.tableWrapper}>
                                 <table className="table">
                                     <thead>
                                         <tr>
@@ -216,17 +249,38 @@ export default function CustomerDashboardPage() {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             )}
                         </div>
 
-                        <div className="panel" id="place-order">
+                        <div className={`panel ${styles.panelCenter}`} id="place-order">
                             <div className="panel-title">Place Order</div>
                             <p className="text-primary leading-17">Book Truck with Details → Wait for Approval → Rate Discussion → Order Confirmation → Track Ride/Live Updates → Payment and Confirmation.</p>
                             {!showPlaceOrder && (
-                                <button className="btn-dark" onClick={() => setShowPlaceOrder(true)}>Book Truck</button>
+                                <>
+                                    <button className="btn-dark" onClick={() => {
+                                        if (guestMode) {
+                                            setShowGuestModal(true);
+                                            return;
+                                        }
+                                        setShowPlaceOrder(true);
+                                    }}>Book Truck</button>
+                                    {showGuestModal && (
+                                        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Login required">
+                                            <div className="modal-panel">
+                                                <h3 style={{marginTop:0}}>Kindly Login or Signup to unlock this feature</h3>
+                                                <div className="row-gap-12" style={{display:'flex',gap:12,marginTop:12}}>
+                                                    <a className="btn-dark" href="/login">Login</a>
+                                                    <a className="btn-dark" href="/register">Sign up</a>
+                                                    <button className="btn-dark" onClick={() => setShowGuestModal(false)}>Close</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                             {showPlaceOrder && (
-                                <form className="form-vertical" onSubmit={async (e) => {
+                                <form className={`${styles.centerForm} form-vertical`} onSubmit={async (e) => {
                                     e.preventDefault();
                                     setPlaceError(null);
                                     setPlaceSuccess(null);
@@ -288,7 +342,7 @@ export default function CustomerDashboardPage() {
                             )}
                         </div>
 
-                        <div className="panel" id="my-bookings">
+                        <div className={`panel ${styles.panelCenter}`} id="my-bookings">
                             <div className="panel-title">My Bookings</div>
                             <div className="text-primary leading-17 mb-18">Requests you submitted for approval. Approved bookings appear later as shipments.</div>
                             {bookingsLoading && <div>Loading…</div>}
@@ -323,50 +377,52 @@ export default function CustomerDashboardPage() {
                             )}
                         </div>
 
-                        <div className="panel" id="rate">
+                        <div className={`panel ${styles.panelCenter} ${styles.panelMiddle}`} id="rate">
                             <div className="panel-title">Rate Calculator</div>
-                            <div className="calc-column">
-                                <select className="filter-input" aria-label="Vehicle Type for Rate" value={rateVehicle} onChange={(e) => setRateVehicle(e.target.value)}>
-                                    <option value="Pickup (1.5T)">Pickup (1.5T)</option>
-                                    <option value="LCV (3.5T)">LCV (3.5T)</option>
-                                    <option value="Truck (9T)">Truck (9T)</option>
-                                    <option value="Truck (16T)">Truck (16T)</option>
-                                    <option value="Trailer (25T)">Trailer (25T)</option>
-                                </select>
-                                <input placeholder="Distance (km)" className="filter-input" value={rateDistance} onChange={(e) => setRateDistance(e.target.value)} />
-                                <input placeholder="Weight (MT)" className="filter-input" value={rateWeight} onChange={(e) => setRateWeight(e.target.value)} />
-                                <button className="btn-dark" onClick={(e) => {
-                                    e.preventDefault();
-                                    const distance = parseFloat(rateDistance || '0');
-                                    const weight = parseFloat(rateWeight || '0');
-                                    const basePerKm: Record<string, number> = {
-                                        'Pickup (1.5T)': 18,
-                                        'LCV (3.5T)': 24,
-                                        'Truck (9T)': 32,
-                                        'Truck (16T)': 38,
-                                        'Trailer (25T)': 45,
-                                    };
-                                    const minCharge: Record<string, number> = {
-                                        'Pickup (1.5T)': 1200,
-                                        'LCV (3.5T)': 1600,
-                                        'Truck (9T)': 2200,
-                                        'Truck (16T)': 2800,
-                                        'Trailer (25T)': 3600,
-                                    };
-                                    const perKm = basePerKm[rateVehicle] ?? 30;
-                                    const min = minCharge[rateVehicle] ?? 2000;
-                                    const weightFactor = Math.max(1, weight / 5);
-                                    const estimate = Math.max(min, Math.round(perKm * distance * weightFactor));
-                                    setRateEstimate(`₹${estimate.toLocaleString('en-IN')}`);
-                                }}>Calculate</button>
-                                <div className="eta">Estimated Price: {rateEstimate}</div>
-                                <div className="text-muted">Note: Rates shown are indicative and may vary with real conditions (traffic, tolls, loading, waiting).</div>
+                            <div className={styles.rateBox}>
+                                <div className={`${styles.centerCalc} calc-column`}>
+                                    <select className="filter-input" aria-label="Vehicle Type for Rate" value={rateVehicle} onChange={(e) => setRateVehicle(e.target.value)}>
+                                        <option value="Pickup (1.5T)">Pickup (1.5T)</option>
+                                        <option value="LCV (3.5T)">LCV (3.5T)</option>
+                                        <option value="Truck (9T)">Truck (9T)</option>
+                                        <option value="Truck (16T)">Truck (16T)</option>
+                                        <option value="Trailer (25T)">Trailer (25T)</option>
+                                    </select>
+                                    <input placeholder="Distance (km)" className="filter-input" value={rateDistance} onChange={(e) => setRateDistance(e.target.value)} />
+                                    <input placeholder="Weight (MT)" className="filter-input" value={rateWeight} onChange={(e) => setRateWeight(e.target.value)} />
+                                    <button className="btn-dark" onClick={(e) => {
+                                        e.preventDefault();
+                                        const distance = parseFloat(rateDistance || '0');
+                                        const weight = parseFloat(rateWeight || '0');
+                                        const basePerKm: Record<string, number> = {
+                                            'Pickup (1.5T)': 18,
+                                            'LCV (3.5T)': 24,
+                                            'Truck (9T)': 32,
+                                            'Truck (16T)': 38,
+                                            'Trailer (25T)': 45,
+                                        };
+                                        const minCharge: Record<string, number> = {
+                                            'Pickup (1.5T)': 1200,
+                                            'LCV (3.5T)': 1600,
+                                            'Truck (9T)': 2200,
+                                            'Truck (16T)': 2800,
+                                            'Trailer (25T)': 3600,
+                                        };
+                                        const perKm = basePerKm[rateVehicle] ?? 30;
+                                        const min = minCharge[rateVehicle] ?? 2000;
+                                        const weightFactor = Math.max(1, weight / 5);
+                                        const estimate = Math.max(min, Math.round(perKm * distance * weightFactor));
+                                        setRateEstimate(`₹${estimate.toLocaleString('en-IN')}`);
+                                    }}>Calculate</button>
+                                    <div className={`${styles.panelCenter} eta`}>Estimated Price: {rateEstimate}</div>
+                                    <div className="text-muted">Note: Rates shown are indicative and may vary with real conditions (traffic, tolls, loading, waiting).</div>
+                                </div>
                             </div>
                         </div>
                     </section>
 
                     <aside className="col-gap-32">
-                        <div className="panel" id="notifications">
+                        <div className={`panel ${styles.panelCenter}`} id="notifications">
                             <div className="panel-title">Notifications</div>
                             <ul>
                                 <li>Shipment #1002 is in transit.</li>
@@ -374,7 +430,7 @@ export default function CustomerDashboardPage() {
                                 <li>Support ticket #202 resolved.</li>
                             </ul>
                         </div>
-                        <div className="panel" id="documents">
+                        <div className={`panel ${styles.panelCenter}`} id="documents">
                             <div className="panel-title">Document Center</div>
                             <ul>
                                 <li>Waybill</li>
@@ -383,11 +439,11 @@ export default function CustomerDashboardPage() {
                                 <li>Compliance</li>
                             </ul>
                         </div>
-                                    <div className="panel" id="aboutus">
-                            <div className="panel-title">About Us</div>
-                                        <div className="text-primary text-1rem leading-17"><strong>Rajmohan Transport Services</strong> provides reliable, efficient, and safe transportation solutions. Real-time tracking, easy booking, and dedicated support.</div>
-                        </div>
-                        <div className="panel" id="support">
+                    <div className={`panel ${styles.panelCenter}`} id="aboutus">
+                <div className="panel-title">About Us</div>
+                    <div className="text-primary text-1rem leading-17"><strong>Rajmohan Transport Services</strong> provides reliable, efficient, and safe transportation solutions. Real-time tracking, easy booking, and dedicated support.</div>
+            </div>
+                        <div className={`panel ${styles.panelCenter}`} id="support">
                             <div className="panel-title">Support</div>
                             <div className="row-gap-24">
                                 <a className="btn-dark" href="#">Start Chat</a>

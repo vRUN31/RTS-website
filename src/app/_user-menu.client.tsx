@@ -11,6 +11,7 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [guest, setGuest] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -28,6 +29,14 @@ export default function UserMenu() {
     return () => { mounted = false; };
   }, [supabase]);
 
+  // Detect guest mode from URL query (?guest=true)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      setGuest(params.get('guest') === 'true');
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       if (!menuRef.current) return;
@@ -38,6 +47,25 @@ export default function UserMenu() {
   }, []);
 
   if (!email) {
+    if (guest) {
+      return (
+        <div className="user-menu user-guest" ref={menuRef}>
+          <button className="user-avatar guest" aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
+            <span className="avatar-circle" aria-hidden>G</span>
+            <span className="email">Guest</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M7 10l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {open && (
+            <div className="user-dropdown" role="menu">
+              <a className="dropdown-item" href="/login" role="menuitem">Login</a>
+              <a className="dropdown-item" href="/register" role="menuitem">Sign up</a>
+            </div>
+          )}
+        </div>
+      );
+    }
     return (
       <div className="user-menu">
         <a className="btn-login" href="/login">Login</a>
@@ -46,9 +74,10 @@ export default function UserMenu() {
     );
   }
 
+  // Show styled avatar+email button and dropdown for real users only
   return (
     <div className="user-menu" ref={menuRef}>
-  <button className="user-avatar" aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
+      <button className="user-avatar" aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
         <span className="avatar-circle" aria-hidden>{email[0]?.toUpperCase() ?? 'U'}</span>
         <span className="email">{email}</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -57,10 +86,23 @@ export default function UserMenu() {
       </button>
       {open && (
         <div className="user-dropdown" role="menu">
-          {profile?.role === 'admin' && (
-            <a className="dropdown-item" href="/admin" role="menuitem">Admin Dashboard</a>
+          {profile?.role === 'admin' ? (
+            <>
+              <a className="dropdown-item" href="/admin" role="menuitem">Admin Dashboard</a>
+              <a className="dropdown-item" href="/contracts" role="menuitem">Contracts</a>
+              <a className="dropdown-item" href="/settings" role="menuitem">Settings</a>
+            </>
+          ) : profile?.role === 'client' ? (
+            <>
+              <a className="dropdown-item" href="/dashboard/customer" role="menuitem">My Dashboard</a>
+              <a className="dropdown-item" href="/bookings" role="menuitem">My Bookings</a>
+              <a className="dropdown-item" href="/settings" role="menuitem">Settings</a>
+            </>
+          ) : (
+            <>
+              <a className="dropdown-item" href="/settings" role="menuitem">Settings</a>
+            </>
           )}
-          <a className="dropdown-item" href="/settings" role="menuitem">Settings</a>
           <button className="dropdown-item danger" role="menuitem" onClick={async () => {
             await supabase.auth.signOut();
             router.push('/login');

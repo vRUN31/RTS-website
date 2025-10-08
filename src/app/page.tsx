@@ -45,7 +45,15 @@ export default async function HomePage() {
                 )}
             </main>
             <footer className="text-center mt-32">
-                <div>&copy; RTS. All rights reserved.</div>
+                <div className="footer-grid">
+                    <div>&copy; RTS. All rights reserved.</div>
+                    <div className="footer-contact">
+                        <strong>Contact Us</strong>
+                        <div className="muted-small">Phone: <a href="tel:+911234567890">+91 12345 67890</a></div>
+                        <div className="muted-small">Email: <a href="mailto:info@rajmohan.com">info@rajmohan.com</a></div>
+                        <div className="muted-small">Address: 12, Industrial Estate, Chennai, Tamil Nadu, India</div>
+                    </div>
+                </div>
             </footer>
         </>
     );

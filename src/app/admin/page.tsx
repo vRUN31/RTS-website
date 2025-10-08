@@ -21,10 +21,12 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
     // Date range and grain controls
     const now = new Date();
-    const range = (typeof searchParams?.range === 'string' ? searchParams?.range : 'month') as 'hour'|'day'|'month'|'year';
-    const grain = (typeof searchParams?.grain === 'string' ? searchParams?.grain : range) as 'hour'|'day'|'month'|'year';
-    const startParam = typeof searchParams?.start === 'string' ? searchParams?.start : undefined;
-    const endParam = typeof searchParams?.end === 'string' ? searchParams?.end : undefined;
+    // `searchParams` may be a dynamic/special object in Next; await it first per Next.js guidance
+    const params = (await (searchParams as unknown)) as Record<string, string | string[] | undefined> | undefined;
+    const range = (typeof params?.range === 'string' ? params?.range : 'month') as 'hour'|'day'|'month'|'year';
+    const grain = (typeof params?.grain === 'string' ? params?.grain : range) as 'hour'|'day'|'month'|'year';
+    const startParam = typeof params?.start === 'string' ? params?.start : undefined;
+    const endParam = typeof params?.end === 'string' ? params?.end : undefined;
     const endDate = endParam ? new Date(endParam) : now;
     const startDate = startParam ? new Date(startParam) : new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
@@ -157,6 +159,26 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         trucksByStatus[s] = count ?? 0;
     }
 
+    // Fetch all pending (submitted) bookings for admin review
+    // Fetch pending bookings for admin review (no join)
+    const { data: pendingBookings } = await supabase
+        .from('bookings')
+        .select('id, user_id, client_id, source_city, destination_city, vehicle_type, material, weight_mt, pickup_date, notes, status, created_at')
+        .eq('status', 'submitted')
+        .order('created_at', { ascending: false });
+
+    async function handleBookingAction(bookingId: string, action: 'approved' | 'rejected') {
+        'use server';
+        const cookieStore = await cookies();
+        const supabase = createServerSupabase(cookieStore as any);
+        await supabase
+            .from('bookings')
+            .update({ status: action })
+            .eq('id', bookingId);
+        // Optionally: notify client here
+        redirect('/admin');
+    }
+
     return (
         <main className="dashboard-container">
             <h1 className="panel-title">Admin Dashboard</h1>
@@ -263,6 +285,56 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                         ))}
                     </tbody>
                 </table>
+            </section>
+
+            {/* Manage Book Truck Requests */}
+            <section className="admin-bookings-panel mt-16">
+                <div className="panel-title">Manage Book Truck Requests</div>
+                {pendingBookings && pendingBookings.length > 0 ? (
+                    <table className="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Client/User</th>
+                                <th>Source</th>
+                                <th>Destination</th>
+                                <th>Vehicle</th>
+                                <th>Weight</th>
+                                <th>Pickup</th>
+                                <th>Material</th>
+                                <th>Notes</th>
+                                <th>Requested</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {pendingBookings.map((b: any) => (
+                                <tr key={b.id}>
+                                    <td>{String(b.id).slice(0,8)}…</td>
+                                    <td>{b.client_id || b.user_id || '—'}</td>
+                                    <td>{b.source_city ?? '—'}</td>
+                                    <td>{b.destination_city ?? '—'}</td>
+                                    <td>{b.vehicle_type ?? '—'}</td>
+                                    <td>{b.weight_mt ?? '—'}</td>
+                                    <td>{b.pickup_date?.slice(0,10) ?? '—'}</td>
+                                    <td>{b.material ?? '—'}</td>
+                                    <td>{b.notes ?? '—'}</td>
+                                    <td>{b.created_at?.slice(0,10) ?? '—'}</td>
+                                    <td className="action-cell">
+                                        <form action={handleBookingAction.bind(null, b.id, 'approved')} method="post">
+                                            <button className="btn-dark" type="submit">Approve</button>
+                                        </form>
+                                        <form action={handleBookingAction.bind(null, b.id, 'rejected')} method="post">
+                                            <button className="btn-dark" type="submit">Reject</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : (
+                    <div className="muted-small">No pending booking requests.</div>
+                )}
             </section>
         </main>
     );

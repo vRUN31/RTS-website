@@ -1,3 +1,41 @@
+/* Admin Bookings Panel Styling */
+.admin-bookings-panel {
+    background: linear-gradient(120deg, #fff7f0 80%, #f6f6f6 100%);
+    border: 2px solid #ffe0d3;
+    box-shadow: 0 8px 32px rgba(255,77,0,0.07);
+    border-radius: 16px;
+    padding: 28px 18px 22px 18px;
+    margin-bottom: 32px;
+}
+.admin-bookings-panel .panel-title {
+    font-size: 1.25rem;
+    color: #ff4d00;
+    font-weight: 800;
+    margin-bottom: 18px;
+    letter-spacing: 0.5px;
+}
+.admin-bookings-panel .table th, .admin-bookings-panel .table td {
+    padding: 10px 12px;
+    font-size: 1.05rem;
+}
+.admin-bookings-panel .table th {
+    background: #fff3e6;
+    color: #d13c00;
+    border-bottom: 2px solid #ffe0d3;
+}
+.admin-bookings-panel .table tbody tr:hover {
+    background: #fff7f0;
+}
+.admin-bookings-panel .btn-dark {
+    min-width: 90px;
+    margin-bottom: 4px;
+}
+.admin-bookings-panel .action-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
 /* Fonts loaded in layout <head> */
 
 :root{
@@ -282,3 +320,91 @@ header.site-header {
 .mainnav { max-width: 1400px; margin: 0 auto; display: flex; justify-content: center; gap: 36px; padding: 10px 16px; }
 .mainnav a { color: #111; text-decoration: none; font-weight: 700; letter-spacing: 0.2px; }
 .mainnav a:hover { color: #ff4500; }
+
+/* Enhanced dashboard visuals */
+.dashboard-container {
+    padding: 28px;
+    border-radius: 14px;
+}
+
+/* Larger panel headers and subtle separators */
+.panel {
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 30px rgba(17,17,17,0.04);
+}
+.panel-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.panel-title h4 { margin: 0; }
+
+/* Card header badge */
+.panel .panel-badge {
+    background: linear-gradient(90deg,var(--brand),#ff7c3a);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+/* Make grid responsive */
+@media (max-width: 980px) {
+    .grid-2-1 { grid-template-columns: 1fr; }
+    .topbar-inner { grid-template-columns: 1fr auto; }
+}
+
+/* Sidebar panels (right column) */
+aside .panel { background: linear-gradient(180deg,#fff,#fcfcfd); border-radius: 12px; }
+
+/* Tables */
+.table { border-radius: 8px; overflow: hidden; box-shadow: 0 6px 20px rgba(12,24,48,0.04); }
+.table thead { background: linear-gradient(90deg,#fff,#fbfbfb); }
+.table th { font-weight: 700; color: #0d2a3a; }
+.table tbody tr:hover { background: linear-gradient(90deg,#fff6f2,#fff); }
+
+/* Buttons */
+.btn-dark { padding: 10px 16px; border-radius: 10px; font-weight: 700; letter-spacing: 0.2px; }
+.btn-ghost { background: transparent; border: 1px solid rgba(0,0,0,0.06); color: #333; padding: 8px 12px; border-radius: 8px; }
+
+/* Modal (guest) */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.modal-panel { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.18); max-width: 520px; width: 90%; }
+.modal-panel h3 { margin: 0 0 12px 0; font-size: 1.2rem; color: #18321f; }
+
+/* Small helpers */
+.muted-small { color: #777; font-size: 0.95rem; }
+
+/* Dashboard enhancements */
+/* dashboard styles moved to dashboard.module.css */
+
+/* Footer contact styling */
+
+/* Centered footer layout */
+.footer-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 0 10px 0;
+}
+.footer-contact {
+    text-align: center;
+    margin-bottom: 2px;
+}
+.footer-contact a {
+    color: var(--brand);
+    text-decoration: none;
+}
+.footer-contact a:hover {
+    text-decoration: underline;
+}
+.footer-copyright {
+    color: #888;
+    font-size: 0.98rem;
+}
+
+

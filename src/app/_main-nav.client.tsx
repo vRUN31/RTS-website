@@ -42,7 +42,7 @@ export default function MainNav() {
 
   return (
     <nav className="mainnav" aria-label="Primary">
-      <a href="/contracts" data-transition>Contracts</a>
+      {isAdmin && <a href="/contracts" data-transition>Contracts</a>}
       <a href={dashboardHref} data-transition>Dashboard</a>
       {isAdmin && <a href="/admin" data-transition>Admin</a>}
     </nav>

@@ -24,10 +24,9 @@ export default function LoginPage() {
     async function onSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError(null);
-        // If Supabase is not configured, fallback to demo redirect
         if (!supabaseUrl || !supabaseAnonKey) {
             console.warn('Supabase env not configured; skipping real auth.');
-            window.location.href = role === 'admin' ? '/admin' : '/dashboard/customer';
+            // No dashboard redirect for demo mode; just return
             return;
         }
         try {
@@ -83,7 +82,11 @@ export default function LoginPage() {
     }
 
     return (
-        <main className="main-centered">
+        <main className="main-centered" style={{ position: 'relative' }}>
+            <Link href="/" className="back-btn" style={{ position: 'absolute', top: 24, left: 24, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontWeight: 700, fontSize: 18, boxShadow: '0 2px 8px rgba(255,77,0,0.10)' }}>&larr;</span>
+                <span style={{ color: 'var(--brand)', fontWeight: 600, fontSize: 16 }}>Back</span>
+            </Link>
             <div className="logo-text">RTS</div>
             <div className="card card-gradient card-compact">
                 <h4 className="title">Login</h4>

@@ -17,6 +17,7 @@ export default function ContractsPage() {
     const [rows, setRows] = useState<Contract[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [role, setRole] = useState<'admin' | 'client' | null>(null);
     const [filter, setFilter] = useState<'all' | 'active' | 'expired'>('all');
     const [showCreate, setShowCreate] = useState(false);
     const [newStart, setNewStart] = useState('');
@@ -35,6 +36,13 @@ export default function ContractsPage() {
                     if (isMounted) setRows([]);
                 } else {
                     const supabase = createClient();
+                    try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user?.id) {
+                            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+                            if (isMounted) setRole((profile as any)?.role ?? null);
+                        }
+                    } catch { /* ignore role lookup errors */ }
                     let query = supabase
                         .from('contracts')
                         .select('*')
@@ -76,11 +84,15 @@ export default function ContractsPage() {
                         </select>
                     </div>
                     <div className="row-gap-12">
-                        <a className="btn-dark" onClick={() => setShowCreate(s => !s)} href="#">{showCreate ? 'Close' : 'Create Contract'}</a>
+                        {role === 'admin' ? (
+                            <a className={`btn-dark`} onClick={(e) => { e.preventDefault(); setShowCreate(s => !s); }} href="#">{showCreate ? 'Close' : 'Create Contract'}</a>
+                        ) : (
+                            <div className="text-muted">Contracts are managed by admins. If you need a contract, please contact support or an account manager.</div>
+                        )}
                     </div>
                 </div>
 
-                {showCreate && (
+                {showCreate && role === 'admin' && (
                     <form
                         className="panel mt-16 form-vertical"
                         onSubmit={async (e) => {

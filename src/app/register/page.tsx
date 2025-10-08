@@ -14,7 +14,11 @@ export default function RegisterPage() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	return (
-		<main className="main-centered">
+		<main className="main-centered" style={{ position: 'relative' }}>
+			<Link href="/" className="back-btn" style={{ position: 'absolute', top: 24, left: 24, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+				<span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontWeight: 700, fontSize: 18, boxShadow: '0 2px 8px rgba(255,77,0,0.10)' }}>&larr;</span>
+				<span style={{ color: 'var(--brand)', fontWeight: 600, fontSize: 16 }}>Back</span>
+			</Link>
 			<div className="logo-text">RTS</div>
 			<div className="card card-medium mt-16">
 				<div className="title text-dark mb-18">Sign Up</div>
@@ -24,7 +28,7 @@ export default function RegisterPage() {
 						setError(null);
 						if (!supabaseUrl || !supabaseAnonKey) {
 							console.warn('Supabase env not configured; mocking sign-up flow.');
-							window.location.href = role === 'admin' ? '/admin' : '/dashboard/customer';
+							// No dashboard redirect for demo mode; just return
 							return;
 						}
 						try {
@@ -77,7 +81,7 @@ export default function RegisterPage() {
 						</label>
 					</div>
 					{error && <div className="text-center text-dim" role="alert">{error}</div>}
-					<button className="btn-submit" type="submit" disabled={loading}>{loading ? 'Creating account…' : 'Continue'}</button>
+					<button className="btn-submit" type="submit" disabled={loading}>{loading ? 'Creating account\u2026' : 'Continue'}</button>
 					<div className="text-center text-muted">By signing up, you agree to our <a href="/terms" className="link-primary">Terms</a> and <a href="/privacy" className="link-primary">Privacy</a>.</div>
 				</form>
 				<div className="text-center mt-18">
