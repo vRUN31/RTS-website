@@ -36,7 +36,7 @@ export default function MainNav() {
     } catch { /* ignore */ }
   }, []);
 
-  const dashboardHref = role === 'admin' ? '/admin/analytics' : (guest ? '/dashboard/customer?guest=true' : '/dashboard/customer');
+  const dashboardHref = role === 'admin' ? '/admin' : (guest ? '/dashboard/customer?guest=true' : '/dashboard/customer');
 
   async function handleHomeClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
@@ -51,9 +51,10 @@ export default function MainNav() {
 
   return (
     <nav className="mainnav" aria-label="Primary">
-      <a href="/" onClick={handleHomeClick} data-transition>Home</a>
+      {role !== 'admin' && <a href="/" onClick={handleHomeClick} data-transition>Home</a>}
       <a href={dashboardHref} data-transition>Dashboard</a>
-  <a href="/manage-trucks" data-transition>Manage Trucks</a>
+    {role === 'admin' && <a href="/admin/analytics" data-transition>Analytics</a>}
+    <a href="/manage-trucks" data-transition>Manage Trucks</a>
     </nav>
   );
 }

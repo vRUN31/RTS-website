@@ -6,18 +6,56 @@ create table if not exists profiles (
   id uuid primary key references auth.users on delete cascade,
   role text not null check (role in ('admin','client')),
   name text,
+  email text,
   client_id uuid,
   created_at timestamptz default now()
 );
 
 alter table profiles enable row level security;
 
-create policy "profiles self read" on profiles
+drop policy if exists "profiles self read" on public.profiles;
+create policy "profiles self read" on public.profiles
   for select using (auth.uid() = id);
-create policy "profiles self update" on profiles
+drop policy if exists "profiles self update" on public.profiles;
+create policy "profiles self update" on public.profiles
   for update using (auth.uid() = id);
-create policy "profiles self insert" on profiles
+drop policy if exists "profiles self insert" on public.profiles;
+create policy "profiles self insert" on public.profiles
   for insert with check (auth.uid() = id);
+
+-- Helper: boolean check without referencing profiles policies recursively
+create or replace function public.is_admin(uid uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $fn$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = $1 and p.role = 'admin'
+  );
+$fn$;
+grant execute on function public.is_admin(uuid) to anon, authenticated;
+
+-- Allow admins to read all profiles (needed for admin dashboards) without recursion
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'profiles'
+      and policyname = 'profiles admin read'
+  ) then
+    create policy "profiles admin read" on public.profiles
+      for select using (public.is_admin(auth.uid()));
+  end if;
+end $$;
+
+-- Backward-compatible migration helpers
+alter table if exists profiles
+  add column if not exists email text;
+create index if not exists idx_profiles_email on profiles(email);
 
 -- clients (admin-managed)
 create table if not exists clients (
@@ -31,10 +69,11 @@ create table if not exists clients (
 
 alter table clients enable row level security;
 
--- admins can do everything (example policy, adapt to your auth model)
-create policy "clients admin all" on clients for all using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
-);
+-- admins can do everything (idempotent)
+drop policy if exists "clients admin all" on public.clients;
+create policy "clients admin all" on public.clients for all using (
+  public.is_admin(auth.uid())
+) with check (public.is_admin(auth.uid()));
 
 -- contracts
 create table if not exists contracts (
@@ -50,10 +89,12 @@ create table if not exists contracts (
 
 alter table contracts enable row level security;
 
-create policy "contracts admin read" on contracts for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+drop policy if exists "contracts admin read" on public.contracts;
+create policy "contracts admin read" on public.contracts for select using (
+  public.is_admin(auth.uid())
 );
-create policy "contracts client read" on contracts for select using (
+drop policy if exists "contracts client read" on public.contracts;
+create policy "contracts client read" on public.contracts for select using (
   exists (
     select 1 from profiles p
     join clients c on p.client_id = c.id
@@ -80,14 +121,22 @@ create table if not exists shipments (
 
 alter table shipments enable row level security;
 
-create policy "shipments admin read" on shipments for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+drop policy if exists "shipments admin read" on public.shipments;
+create policy "shipments admin read" on public.shipments for select using (
+  public.is_admin(auth.uid())
 );
-create policy "shipments client read" on shipments for select using (
+drop policy if exists "shipments client read" on public.shipments;
+create policy "shipments client read" on public.shipments for select using (
   exists (
     select 1 from profiles p
     where p.id = auth.uid() and p.role = 'client' and p.client_id = shipments.client_id
   )
+);
+
+-- Allow admins to create shipments during booking approvals
+drop policy if exists "shipments admin insert" on public.shipments;
+create policy "shipments admin insert" on public.shipments for insert with check (
+  public.is_admin(auth.uid())
 );
 
 -- trucks
@@ -96,6 +145,7 @@ create table if not exists trucks (
   plate text,
   device_id text,
   status text,
+  location text,
   last_lat double precision,
   last_lng double precision,
   speed numeric,
@@ -104,9 +154,45 @@ create table if not exists trucks (
 );
 
 alter table trucks enable row level security;
-create policy "trucks admin read" on trucks for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+drop policy if exists "trucks admin read" on public.trucks;
+create policy "trucks admin read" on public.trucks for select using (
+  public.is_admin(auth.uid())
 );
+drop policy if exists "trucks admin insert" on public.trucks;
+create policy "trucks admin insert" on public.trucks for insert with check (
+  public.is_admin(auth.uid())
+);
+drop policy if exists "trucks admin update" on public.trucks;
+create policy "trucks admin update" on public.trucks for update using (
+  public.is_admin(auth.uid())
+) with check (public.is_admin(auth.uid()));
+drop policy if exists "trucks admin delete" on public.trucks;
+create policy "trucks admin delete" on public.trucks for delete using (
+  public.is_admin(auth.uid())
+);
+
+-- drivers (store driver details, linked optionally from trucks)
+create table if not exists drivers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text,
+  license_no text,
+  license_expiry date,
+  experience_years int,
+  address text,
+  emergency_contact text,
+  created_at timestamptz default now()
+);
+
+alter table drivers enable row level security;
+drop policy if exists "drivers admin read" on public.drivers;
+create policy "drivers admin read" on public.drivers for select using (
+  public.is_admin(auth.uid())
+);
+
+-- Backfill association from trucks to drivers
+alter table if exists public.trucks
+  add column if not exists driver_id uuid references public.drivers(id);
 
 -- telemetry
 create table if not exists telemetry (
@@ -120,14 +206,24 @@ create table if not exists telemetry (
 );
 
 alter table telemetry enable row level security;
-create policy "telemetry admin read" on telemetry for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+drop policy if exists "telemetry admin read" on public.telemetry;
+create policy "telemetry admin read" on public.telemetry for select using (
+  public.is_admin(auth.uid())
 );
 
+-- Backward-compatible: ensure columns exist before indexing (for legacy DBs)
+alter table if exists public.shipments
+  add column if not exists eta timestamptz;
+alter table if exists public.shipments
+  add column if not exists delivered_at timestamptz;
+-- Ensure trucks.location exists for legacy DBs
+alter table if exists public.trucks
+  add column if not exists location text;
+
 -- Helpful indexes for analytics
-create index if not exists idx_shipments_created_at on shipments(created_at);
-create index if not exists idx_shipments_eta_delivered on shipments(eta, delivered_at);
-create index if not exists idx_telemetry_truck_ts on telemetry(truck_id, ts);
+create index if not exists idx_shipments_created_at on public.shipments(created_at);
+create index if not exists idx_shipments_eta_delivered on public.shipments(eta, delivered_at);
+create index if not exists idx_telemetry_truck_ts on public.telemetry(truck_id, ts);
 
 -- dispatch_offers
 create table if not exists dispatch_offers (
@@ -157,7 +253,8 @@ create table if not exists notifications (
 alter table notifications enable row level security;
 
 -- helper view or policy for notifications (self read)
-create policy "notifications self read" on notifications for select using (
+drop policy if exists "notifications self read" on public.notifications;
+create policy "notifications self read" on public.notifications for select using (
   user_id = auth.uid()
 );
 
@@ -179,10 +276,16 @@ create table if not exists bookings (
 
 alter table bookings enable row level security;
 
-create policy "bookings admin read" on bookings for select using (
-  exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'admin')
+drop policy if exists "bookings admin read" on public.bookings;
+create policy "bookings admin read" on public.bookings for select using (
+  public.is_admin(auth.uid())
 );
-create policy "bookings client read" on bookings for select using (
+drop policy if exists "bookings admin update" on public.bookings;
+create policy "bookings admin update" on public.bookings for update using (
+  public.is_admin(auth.uid())
+) with check (public.is_admin(auth.uid()));
+drop policy if exists "bookings client read" on public.bookings;
+create policy "bookings client read" on public.bookings for select using (
   exists (
     select 1 from profiles p
     where p.id = auth.uid()
@@ -193,7 +296,8 @@ create policy "bookings client read" on bookings for select using (
       )
   )
 );
-create policy "bookings client insert" on bookings for insert with check (
+drop policy if exists "bookings client insert" on public.bookings;
+create policy "bookings client insert" on public.bookings for insert with check (
   exists (
     select 1 from profiles p
     where p.id = auth.uid()

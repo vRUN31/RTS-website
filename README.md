@@ -1,118 +1,173 @@
 # Raj Mohan Transport Services (RTS)
 
-Next.js 15 App Router application with Supabase for authentication and data management. Features role-based access control, live GPS tracking, and analytics dashboard for transport logistics management.
+Next.js 15 App Router app with Supabase for auth, database, and realtime. It provides role-based admin/client flows, live fleet map, analytics, bookings, and basic truck/driver management.
 
-## Current Status (October 2025)
+## What’s in here (Oct 2025)
 
-**✅ Completed MVP Features:**
-- Next.js 15 App Router with TypeScript and Supabase integration
-- Authentication system with role-based routing (admin/client)
-- Admin dashboard with live fleet map, KPI cards, and analytics
-- Customer dashboard with shipment tracking and limited map view
-- Contracts management with Active/Expired filtering
-- CSV export functionality for shipments
-- Responsive UI with conditional navigation (TopShell component)
-- Enhanced logout with proper backend synchronization
-- Leaflet.js integration for live GPS tracking
-- Real-time updates via Supabase Realtime
+Completed
+- Next.js App Router + TypeScript + Supabase integration
+- Auth with role-based gating (profiles.role in ['admin','client']) and admin allowlist by domain/email
+- Admin dashboard (/admin) with:
+  - KPI cards, recent shipments, Leaflet map (full fleet view)
+  - Date range and grain filters, CSV export (admin/export/shipments)
+  - Manage Book Truck Requests with Approve/Reject actions
+- Analytics (/admin/analytics) charts via a client component
+- Client dashboard (/dashboard/customer) with scoped shipments and limited map
+- Contracts list (/contracts) with Active/Expired filter
+- Manage Trucks (/manage-trucks) that persists to Supabase
+- Top-level route shims to avoid 404s and normalize legacy URLs
 
-**🔧 Recent Fixes:**
-- Next.js 15 compatibility for async searchParams
-- Conditional header rendering (hidden on home, register, admin routes)
-- Improved logout flow with proper state clearing and home redirect
-- Build stability and error handling improvements
+Recent updates
+- Fixed route inconsistencies: added app/admin/analytics and app/manage-trucks shims; legacy /admin-analytics now redirects to /admin/analytics
+- Navigation: for admins, Dashboard → /admin and Analytics → /admin/analytics; “Home” hidden (brand navigates home)
+- Approval UX: Approve opens a responsive Assign Truck modal; Reject updates immediately
+- Approval logic: creates a shipment with basic validation and enrichment (ETA, cost, contract)
+- Schema hardened and idempotent: added public.is_admin(uid) helper, RLS policies use DROP IF EXISTS + CREATE, indexes guarded
+- Client/server boundary fixes: extracted the page-level modal listener into a dedicated Client Component `src/components/admin/OpenAssignTruckModalListener.client.tsx` and imported it in `src/app/admin/page.tsx` (fixes “useState only works in Client Components”)
+- Hydration fix for table modal: Assign Truck modal renders via a portal attached to `document.body` to avoid putting a `<div>` inside `<tbody>`; see `src/components/admin/AssignTruckModal.client.tsx`
+- Schema guard: ensured `trucks.location` exists via idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `supabase/schema.sql`; `drivers` table and `trucks.driver_id` linkage included
 
-Static HTML prototypes remain under `src/Dasboard` and `src/login and reg` for reference during migration.
+Static HTML prototypes are still available under `src/Dasboard` and `src/login and reg` for reference.
 
 ## Quick start
 
-1. Copy `.env.local.example` to `.env.local` and set:
-    - `NEXT_PUBLIC_SUPABASE_URL`
-    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-    - `NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS` (comma-separated domains allowed to sign up/login as admin; e.g., `rts.co.in,example.com`)
-    - `NEXT_PUBLIC_ADMIN_EMAILS` (comma-separated explicit admin emails; e.g., `chopadeshyam8@gmail.com,owner@rts.co.in`)
-2. Install deps
-3. Install deps:
+1) Configure env
 
-    npm install
+- Copy `.env.local.example` to `.env.local` and fill:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS` (comma-separated domains)
+  - `NEXT_PUBLIC_ADMIN_EMAILS` (comma-separated emails)
 
-4. Start dev server (PowerShell / CMD on Windows):
+2) Install and run
 
-    npm run dev
+```bash
+npm install
+npm run dev
+```
 
-    - The Next.js dev server will attempt to use port 3000 by default. If port 3000 is occupied the server will automatically pick the next available port (for example 3001). The terminal log will show which port it's using.
+Alternatively, using Bun:
 
-5. Quick test notes
+```bash
+bun install
+bun run dev
+```
 
-- To test the static HTML prototypes open `src/Dasboard/customer.html` and `src/login and reg/*.html` directly in your browser or serve them via the dev server while you iterate.
-- Guest mode: append `?guest=true` to dashboard URLs to simulate a guest user. The Book Truck flow will show an in-UI dialog preventing booking for guests.
+The dev server runs on port 3000 when available.
 
-## Supabase setup (optional but recommended)
+## Supabase setup
 
-1. Create a new project at supabase.com and grab the Project URL and anon key.
-2. Apply schema:
-    - Open the SQL editor in Supabase and run `supabase/schema.sql`.
-3. Seed minimal data:
-    - Insert a row into `clients` and then create a user via Auth. Add a `profiles` row with `id` = the auth user id and `client_id` referencing your client; set `role` to `client` or `admin`.
+1) Create a project on Supabase and get the URL + anon key
+2) Apply schema: open Supabase SQL editor and run `supabase/schema.sql`
+3) Seed minimal data
+- Insert a `clients` row
+- Create a user (Auth) → insert into `profiles` with id = auth user id, role = 'admin' or 'client', and optional client_id for clients
+- Optional: insert trucks, drivers; set `trucks.driver_id` for linking
 
-## Routes and auth
+Tables of interest (high-level)
 
-- `/login` and `/register` use Supabase client auth when env vars are set.
-    - Admin email gate: Admin can sign up/login only if their email domain is in `NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS` OR their email is explicitly listed in `NEXT_PUBLIC_ADMIN_EMAILS`.
-    - On sign-up/login, we bootstrap/read `profiles.role` and route: admin → `/admin`, client → `/dashboard/customer`.
-    - Admin page has an SSR route guard that checks the logged-in user's `profiles.role` and redirects non-admins to `/dashboard/customer`.
-- `/contracts` reads from the `contracts` table with an Active/Expired filter.
-- `/dashboard/customer` shows shipments for the logged-in user's client when linked via `profiles.client_id`. Includes text and status filters.
-    - Live map: shows limited info for clients — truck model and current real-time location of their packages only.
-  
-## Live map and GPS (Leaflet + Supabase)
+- profiles(id, role, name, email, client_id)
+- clients(id, name, ...)
+- contracts(id, client_id, start_at, end_at, ...)
+- shipments(id, client_id, contract_id, truck_id, origin, destination, status, eta, cost, created_at)
+- trucks(id, plate, status, location, driver_id, ...)
+- drivers(id, name, phone, license, ...)
+- telemetry(id, truck_id, ts, lat, lng, speed, status)
+- bookings(id, user_id, client_id, vehicle_type, source_city, destination_city, weight_mt, pickup_date, status)
 
-- We use Leaflet.js for maps. The client-only component is in `src/components/map/LeafletMap.client.tsx`.
-    - In Server Components (e.g., `src/app/admin/page.tsx`), import this client component directly; do NOT use `next/dynamic` with `ssr: false` in an RSC. Instead, rely on the `"use client"` directive inside the component itself.
-    - In Client Components (e.g., `src/app/dashboard/customer/page.tsx`), dynamic import is acceptable.
-- Admin view (`/admin`): full fleet map with live updates and a "More info" popup (truck status, speed, updated time).
-- Client view (`/dashboard/customer`): limited map showing only the assigned truck plate/identifier and the real-time location for their shipments.
+RLS summary (admin highlights)
 
-Realtime updates
+- Profiles: self read/update/insert; admin read via public.is_admin()
+- Clients/Contracts/Shipments/Trucks/Telemetry: admin read; shipments admin insert
+- Bookings: client insert/select; admin read/update
+- Drivers: admin read
 
-- Telemetry rows inserted into `telemetry(truck_id, ts, lat, lng, speed, status)` trigger a Supabase Realtime INSERT event.
-- The UI subscribes to that channel and moves markers accordingly.
+## Core routes and workflows
 
-GPS hardware adapter
+Auth and role routing
 
-- Implement a small adapter (server-side service or edge function) that receives data from your GPS hardware (polling API or webhook) and writes into the Supabase `telemetry` table.
-- Link your trucks in the `trucks` table (plate, model, device_id) and associate shipments with `truck_id` to enable client map visibility.
+- `/login`, `/register`: Supabase auth with admin allowlist
+- Role bootstrap → route admin → `/admin`, client → `/dashboard/customer`
 
-## Architecture Notes
+Admin dashboard `/admin`
 
-- **Next.js 15 Compatibility**: Updated for async searchParams and latest React 18 patterns
-- **Conditional Navigation**: TopShell component provides selective header rendering based on route
-- **File Structure**: Top-level `app/` directory re-exports pages from `src/app/` to maintain route stability
-- **Security**: Avoid committing service_role keys. Only use the anon key in the browser
-- **State Management**: Enhanced logout with proper Supabase state synchronization
+- Guarded SSR; shows KPIs, map, recent shipments, bookings table
+- Approve opens Assign Truck modal: pick a truck (with driver details) and submit
+- Reject marks booking rejected
 
-## Development Roadmap
+Analytics `/admin/analytics`
 
-**🚧 Pending Implementation:**
-- Complete Supabase schema deployment with RLS policies
-- GPS hardware adapter for real telemetry ingestion
-- Driver management and dispatch system
-- Consumer booking with vehicle recommendation
-- Advanced analytics and reporting features
-- Routing algorithms and ETA calculations
-- In-app notification system
-- Document management and storage
-- Communication features (chat, calls)
+- Server-side metrics with client charts
+
+Manage Trucks `/manage-trucks`
+
+- Add/remove trucks persisted in Supabase (id, plate, status, location)
+
+Admin link Drivers ↔ Trucks `/admin/manage-trucks`
+
+- Admin-only SSR page to assign `trucks.driver_id`
+
+Contracts `/contracts`
+
+- Browse and filter contracts client-side
+
+Exports `/admin/export/shipments`
+
+- CSV export for shipments by date range
+
+Route stability and redirects
+- app/* shims re-export src/app/* pages to keep `/admin`, `/admin/analytics`, `/manage-trucks` stable
+- Middleware normalizes legacy paths (`/manage-truck`, `/admin/manage-truck`, `/admin/manage-trucks`) → `/manage-trucks`
+- `/admin-analytics` redirects → `/admin/analytics`
+
+## Maps and realtime
+
+Leaflet client component: `src/components/map/LeafletMap.client.tsx`
+- Admin sees full fleet and telemetry detail
+- Client sees only limited information linked to their shipments
+
+Realtime: insert into `telemetry(truck_id, ts, lat, lng, speed, status)` → UI subscribes and updates markers
+
+GPS ingestion: small adapter process writes to telemetry; `trucks` and `shipments` link data to the map
+
+## UI and responsiveness
+
+- Global styles in `src/app/globals.css` with responsive table and modal patterns
+- Assign Truck modal is scrollable, resizes with viewport, and hides non-essential columns on small screens
+- Top nav for admin hides “Home”; the brand links home
+ - Modal trigger pattern: the Approve button dispatches a window event handled by `src/components/admin/OpenAssignTruckModalListener.client.tsx`, which mounts the modal outside the table via a portal
 
 ## Troubleshooting
 
-- **Build errors**: Recent Next.js 15 compatibility issues have been resolved for searchParams
-- **Missing env**: Pages will fall back to placeholders; set `.env.local` to enable live data
-- **Auth login succeeds but no redirect**: Ensure `profiles.role` exists for the user
-- **Dashboard shows no shipments**: Ensure `profiles.client_id` is set and there are rows in `shipments` with that `client_id`
-- **Map not rendering**: Verify Leaflet CSS is loaded in `src/app/layout.tsx` and that env vars are set so the component can query Supabase
-- **No real-time updates**: Confirm the adapter is inserting into `telemetry` and that Supabase Realtime is enabled for the project
-- **RLS error inserting profile**: Make sure the `profiles` table has a self-insert policy:
-    - `create policy "profiles self insert" on profiles for insert with check (auth.uid() = id);`
-- **Logout not redirecting**: Enhanced logout now properly clears state and redirects to home page
-- **Header showing on landing pages**: TopShell component now conditionally hides navigation on home, register, and admin routes
+- Missing names/emails in admin bookings table: ensure `profiles.name` or `profiles.email` exists for the user; the UI prefers name ⇒ email ⇒ short id
+- 404 for `/admin/analytics` or `/manage-trucks`: confirm top-level shims exist under `app/admin/analytics` and `app/manage-trucks`
+- RLS blocks admin actions: verify `public.is_admin(uid)` function and admin policies are applied from `schema.sql`
+- Map not rendering: check Leaflet CSS link in `src/app/layout.tsx` and env configuration
+
+- TypeError: useState only works in Client Components
+  - Cause: A React hook was used inside a Server Component file.
+  - Fix: Move hook-using logic into a `.client.tsx` component and import it from the server page. This repo uses `src/components/admin/OpenAssignTruckModalListener.client.tsx` and imports it in `src/app/admin/page.tsx`.
+
+- Hydration error: “div inside tbody” when opening the modal from a table row
+  - Cause: Rendering a modal container within a `<tbody>` breaks DOM invariants.
+  - Fix: Render the modal via a portal appended to `document.body`. See `src/components/admin/AssignTruckModal.client.tsx` for the portal pattern.
+
+- Supabase error: column "location" of relation "trucks" does not exist
+  - Cause: The database did not yet have the `trucks.location` column.
+  - Fix: Apply `supabase/schema.sql` which includes `ALTER TABLE trucks ADD COLUMN IF NOT EXISTS location text;` and re-run the app.
+
+## Roadmap (near-term)
+
+- Driver records UI (off-nav) with create/edit; optional documents upload
+- Rich truck status model (running, halt, maintenance, offline), filters and bulk actions
+- ETA from routing service (Mapbox/OSRM/Google) and cost estimation
+- Client intake: vehicle recommendation by weight and lane
+- Analytics expansion: date/grain presets, KPIs, charts (fuel, halts, distance, revenue), CSVs
+- In-app notifications using Supabase Realtime `notifications`
+- Documents via Supabase Storage (contracts, invoices)
+
+## Notes
+
+- Keep service_role secrets out of client code; only anon key in browser
+- Prefer two-step fetches for RLS-safe reads (e.g., shipments → truck_ids → trucks)
+- For Server Components, import client components like Leaflet directly; avoid `next/dynamic({ ssr:false })` in RSC

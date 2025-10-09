@@ -47,7 +47,7 @@ export default function LoginPage() {
             let finalRole: 'admin' | 'client' = 'client';
             const { data: existingProfile } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, name, email')
                 .eq('id', userId)
                 .maybeSingle();
 
@@ -56,7 +56,7 @@ export default function LoginPage() {
                 finalRole = intendedRole;
                 await supabase
                     .from('profiles')
-                    .upsert({ id: userId, role: finalRole })
+                    .upsert({ id: userId, role: finalRole, email })
                     .throwOnError();
             } else {
                 // If user selected Admin (and is allowed), ensure profile is marked admin
@@ -70,6 +70,13 @@ export default function LoginPage() {
                 } else {
                     finalRole = (existingProfile.role === 'admin') ? 'admin' : 'client';
                 }
+                // Ensure email is filled; if name missing, seed with email local-part
+                const updates: any = {};
+                if (!existingProfile.email) updates.email = email;
+                if (!existingProfile.name) updates.name = email.split('@')[0];
+                if (Object.keys(updates).length) {
+                    await supabase.from('profiles').update(updates).eq('id', userId);
+                }
             }
 
             target = finalRole === 'admin' ? '/admin' : '/dashboard/customer';
@@ -82,10 +89,10 @@ export default function LoginPage() {
     }
 
     return (
-        <main className="main-centered" style={{ position: 'relative' }}>
-            <Link href="/" className="back-btn" style={{ position: 'absolute', top: 24, left: 24, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', background: 'var(--brand)', color: '#fff', fontWeight: 700, fontSize: 18, boxShadow: '0 2px 8px rgba(255,77,0,0.10)' }}>&larr;</span>
-                <span style={{ color: 'var(--brand)', fontWeight: 600, fontSize: 16 }}>Back</span>
+        <main className="main-centered pos-relative">
+            <Link href="/" className="back-btn no-underline row-align pos-abs back-link">
+                <span className="back-pill">&larr;</span>
+                <span className="back-text">Back</span>
             </Link>
             <div className="logo-text">RTS</div>
             <div className="card card-gradient card-compact">

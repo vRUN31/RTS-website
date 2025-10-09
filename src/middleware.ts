@@ -20,9 +20,9 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/manage-truck',
-    '/admin/manage-truck',
-    '/admin/manage-trucks',
+    '/manage-truck/:path*',
+    '/admin/manage-truck/:path*',
+    '/admin/manage-trucks/:path*',
   ],
 };
 

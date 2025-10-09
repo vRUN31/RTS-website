@@ -6,6 +6,7 @@ import { createClient as createServerSupabase } from '@/utils/supabase/server';
 import LeafletMap from '@/src/components/map/LeafletMap.client';
 import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
 import BookingActionRow from '@/src/components/admin/BookingActionRow.client';
+import OpenAssignTruckModalListener from '../../components/admin/OpenAssignTruckModalListener.client';
 
 export default async function AdminDashboard({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
     // SSR guard: only admins may access
@@ -170,6 +171,31 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         .eq('status', 'submitted')
         .order('created_at', { ascending: false });
 
+    // Build display labels for "Client/User" column
+    const userIds = Array.from(new Set((pendingBookings ?? []).map(b => b.user_id).filter(Boolean)));
+    const clientIds = Array.from(new Set((pendingBookings ?? []).map(b => b.client_id).filter(Boolean)));
+
+    let profileLabelById: Record<string, string | null> = {};
+    if (userIds.length > 0) {
+        const { data: profilesList } = await supabase
+            .from('profiles')
+            .select('id, name, email')
+            .in('id', userIds);
+        profileLabelById = Object.fromEntries((profilesList ?? []).map((p: any) => {
+            const label = p.name?.trim() || p.email?.trim() || null;
+            return [p.id, label];
+        }));
+    }
+
+    let clientNameById: Record<string, string | null> = {};
+    if (clientIds.length > 0) {
+        const { data: clientsList } = await supabase
+            .from('clients')
+            .select('id, name')
+            .in('id', clientIds);
+        clientNameById = Object.fromEntries((clientsList ?? []).map((c: any) => [c.id, c.name ?? null]));
+    }
+
     async function handleBookingAction(bookingId: string, action: 'approved' | 'rejected') {
         'use server';
         const cookieStore = await cookies();
@@ -184,8 +210,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
     return (
         <main className="dashboard-container">
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '32px 0' }}>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: 700, textAlign: 'center', color: '#ff4d00', margin: 0 }}>
+            <div className="row-center my-32">
+                <h1 className="admin-welcome">
                     Welcome back, Admin!!
                 </h1>
             </div>
@@ -193,25 +219,25 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             {/* Quick filters and actions */}
             <div className="row-between mt-16">
                 <div className="row-gap-12">
-                    <a className="btn-dark" href={`/admin?range=hour&grain=hour`} style={{ textDecoration: 'none' }}>Last Hour</a>
-                    <a className="btn-dark" href={`/admin?range=day&grain=day`} style={{ textDecoration: 'none' }}>Last Day</a>
-                    <a className="btn-dark" href={`/admin?range=month&grain=month`} style={{ textDecoration: 'none' }}>Last 6 Months</a>
-                    <a className="btn-dark" href={`/admin?range=year&grain=month`} style={{ textDecoration: 'none' }}>Year to Date</a>
+                    <a className="btn-dark no-underline" href={`/admin?range=hour&grain=hour`}>Last Hour</a>
+                    <a className="btn-dark no-underline" href={`/admin?range=day&grain=day`}>Last Day</a>
+                    <a className="btn-dark no-underline" href={`/admin?range=month&grain=month`}>Last 6 Months</a>
+                    <a className="btn-dark no-underline" href={`/admin?range=year&grain=month`}>Year to Date</a>
                 </div>
                 <div className="row-gap-12">
-                    <a className="btn-dark" href={`/contracts`} style={{ textDecoration: 'none' }}>Create Contract</a>
-                    <a className="btn-dark" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`} style={{ textDecoration: 'none' }}>Export Shipments CSV</a>
+                    <a className="btn-dark no-underline" href={`/contracts`}>Create Contract</a>
+                    <a className="btn-dark no-underline" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`}>Export Shipments CSV</a>
                 </div>
             </div>
 
             <div className="mt-16 row-between">
                 <div className="row-gap-12">
-                    <a className="pill" href={`/admin?range=hour&grain=hour`} style={{ textDecoration: 'none' }}>Last Hour</a>
-                    <a className="pill" href={`/admin?range=day&grain=day`} style={{ textDecoration: 'none' }}>Last Day</a>
-                    <a className="pill" href={`/admin?range=month&grain=month`} style={{ textDecoration: 'none' }}>Last 6 Months</a>
-                    <a className="pill" href={`/admin?range=year&grain=month`} style={{ textDecoration: 'none' }}>Year to Date</a>
+                    <a className="pill no-underline" href={`/admin?range=hour&grain=hour`}>Last Hour</a>
+                    <a className="pill no-underline" href={`/admin?range=day&grain=day`}>Last Day</a>
+                    <a className="pill no-underline" href={`/admin?range=month&grain=month`}>Last 6 Months</a>
+                    <a className="pill no-underline" href={`/admin?range=year&grain=month`}>Year to Date</a>
                 </div>
-                <form className="row-gap-12" action="/admin" method="get" style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+                <form className="row-gap-12-center" action="/admin" method="get">
                     <input type="hidden" name="grain" value={grain} />
                     <label className="text-muted">
                         Start:
@@ -260,12 +286,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             </div>
 
             {/* Link to analytics page */}
-            <div style={{ textAlign: 'center', margin: '32px 0' }}>
-                <a className="btn-dark" href="/admin-analytics" style={{ fontSize: '1.1rem', textDecoration: 'none' }}>View Analytics & Charts</a>
+            <div className="text-center my-32">
+                <a className="btn-dark no-underline btn-lg" href="/admin/analytics">View Analytics & Charts</a>
             </div>
 
             <section className="panel mt-16">
                 <div className="panel-title">Recent Shipments</div>
+                <div className="table-responsive">
                 <table className="table">
                     <thead>
                         <tr>
@@ -279,7 +306,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                     <tbody>
                         {(recentShipments ?? []).map((s) => (
                             <tr key={s.id}>
-                                <td>{String(s.id).slice(0,8)}…</td>
+                                <td className="cell-id">{String(s.id).slice(0,8)}…</td>
                                 <td>{s.origin ?? '—'}</td>
                                 <td>{s.destination ?? '—'}</td>
                                 <td>{s.status ?? '—'}</td>
@@ -288,12 +315,14 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                         ))}
                     </tbody>
                 </table>
+                </div>
             </section>
 
             {/* Manage Book Truck Requests */}
             <section className="admin-bookings-panel mt-16">
                 <div className="panel-title">Manage Book Truck Requests</div>
                 {pendingBookings && pendingBookings.length > 0 ? (
+                    <div className="table-responsive">
                     <table className="table">
                         <thead>
                             <tr>
@@ -311,15 +340,22 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                             </tr>
                         </thead>
                         <tbody>
-                            {pendingBookings.map((b: any) => (
-                                <BookingActionRow key={b.id} booking={b} />
-                            ))}
+                            {pendingBookings.map((b: any) => {
+                                                                const label = clientNameById[b.client_id as string]
+                                                                    || profileLabelById[b.user_id as string]
+                                                                    || (b.user_id ? `${String(b.user_id).slice(0,8)}…` : '—');
+                                return <BookingActionRow key={b.id} booking={b} displayName={label} />
+                            })}
                         </tbody>
                     </table>
+                    </div>
                 ) : (
                     <div className="muted-small">No pending booking requests.</div>
                 )}
             </section>
+
+            {/* Page-level modal handler to avoid rendering inside <tbody> */}
+            <OpenAssignTruckModalListener />
         </main>
     );
 }
@@ -340,3 +376,5 @@ function toLocalInputValue(d: Date) {
     const mi = pad(d.getMinutes());
     return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
+
+// Client-only listener moved to a dedicated Client Component file
