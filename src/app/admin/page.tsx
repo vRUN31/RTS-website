@@ -1,8 +1,11 @@
+
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient as createServerSupabase } from '@/utils/supabase/server';
+
 import LeafletMap from '@/src/components/map/LeafletMap.client';
 import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
+import BookingActionRow from '@/src/components/admin/BookingActionRow.client';
 
 export default async function AdminDashboard({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
     // SSR guard: only admins may access
@@ -181,28 +184,32 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
     return (
         <main className="dashboard-container">
-            <h1 className="panel-title">Admin Dashboard</h1>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '32px 0' }}>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: 700, textAlign: 'center', color: '#ff4d00', margin: 0 }}>
+                    Welcome back, Admin!!
+                </h1>
+            </div>
 
             {/* Quick filters and actions */}
             <div className="row-between mt-16">
                 <div className="row-gap-12">
-                    <a className="btn-dark" href={`/admin?range=hour&grain=hour`}>Last Hour</a>
-                    <a className="btn-dark" href={`/admin?range=day&grain=day`}>Last Day</a>
-                    <a className="btn-dark" href={`/admin?range=month&grain=month`}>Last 6 Months</a>
-                    <a className="btn-dark" href={`/admin?range=year&grain=month`}>Year to Date</a>
+                    <a className="btn-dark" href={`/admin?range=hour&grain=hour`} style={{ textDecoration: 'none' }}>Last Hour</a>
+                    <a className="btn-dark" href={`/admin?range=day&grain=day`} style={{ textDecoration: 'none' }}>Last Day</a>
+                    <a className="btn-dark" href={`/admin?range=month&grain=month`} style={{ textDecoration: 'none' }}>Last 6 Months</a>
+                    <a className="btn-dark" href={`/admin?range=year&grain=month`} style={{ textDecoration: 'none' }}>Year to Date</a>
                 </div>
                 <div className="row-gap-12">
-                    <a className="btn-dark" href={`/contracts`}>Create Contract</a>
-                    <a className="btn-dark" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`}>Export Shipments CSV</a>
+                    <a className="btn-dark" href={`/contracts`} style={{ textDecoration: 'none' }}>Create Contract</a>
+                    <a className="btn-dark" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`} style={{ textDecoration: 'none' }}>Export Shipments CSV</a>
                 </div>
             </div>
 
             <div className="mt-16 row-between">
                 <div className="row-gap-12">
-                    <a className="pill" href={`/admin?range=hour&grain=hour`}>Last Hour</a>
-                    <a className="pill" href={`/admin?range=day&grain=day`}>Last Day</a>
-                    <a className="pill" href={`/admin?range=month&grain=month`}>Last 6 Months</a>
-                    <a className="pill" href={`/admin?range=year&grain=month`}>Year to Date</a>
+                    <a className="pill" href={`/admin?range=hour&grain=hour`} style={{ textDecoration: 'none' }}>Last Hour</a>
+                    <a className="pill" href={`/admin?range=day&grain=day`} style={{ textDecoration: 'none' }}>Last Day</a>
+                    <a className="pill" href={`/admin?range=month&grain=month`} style={{ textDecoration: 'none' }}>Last 6 Months</a>
+                    <a className="pill" href={`/admin?range=year&grain=month`} style={{ textDecoration: 'none' }}>Year to Date</a>
                 </div>
                 <form className="row-gap-12" action="/admin" method="get" style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
                     <input type="hidden" name="grain" value={grain} />
@@ -252,14 +259,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                 <LeafletMap mode="admin" height={420} />
             </div>
 
-            {/* Analytics & Charts */}
-            <AdminAnalytics
-                shipmentsStatusCounts={shipmentsStatusCounts}
-                shipmentsPerMonth={shipmentsPerMonth}
-                distancePerMonth={distancePerMonth}
-                revenuePerMonth={revenuePerMonth}
-                trucksByStatus={trucksByStatus}
-            />
+            {/* Link to analytics page */}
+            <div style={{ textAlign: 'center', margin: '32px 0' }}>
+                <a className="btn-dark" href="/admin-analytics" style={{ fontSize: '1.1rem', textDecoration: 'none' }}>View Analytics & Charts</a>
+            </div>
 
             <section className="panel mt-16">
                 <div className="panel-title">Recent Shipments</div>
@@ -309,26 +312,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                         </thead>
                         <tbody>
                             {pendingBookings.map((b: any) => (
-                                <tr key={b.id}>
-                                    <td>{String(b.id).slice(0,8)}…</td>
-                                    <td>{b.client_id || b.user_id || '—'}</td>
-                                    <td>{b.source_city ?? '—'}</td>
-                                    <td>{b.destination_city ?? '—'}</td>
-                                    <td>{b.vehicle_type ?? '—'}</td>
-                                    <td>{b.weight_mt ?? '—'}</td>
-                                    <td>{b.pickup_date?.slice(0,10) ?? '—'}</td>
-                                    <td>{b.material ?? '—'}</td>
-                                    <td>{b.notes ?? '—'}</td>
-                                    <td>{b.created_at?.slice(0,10) ?? '—'}</td>
-                                    <td className="action-cell">
-                                        <form action={handleBookingAction.bind(null, b.id, 'approved')} method="post">
-                                            <button className="btn-dark" type="submit">Approve</button>
-                                        </form>
-                                        <form action={handleBookingAction.bind(null, b.id, 'rejected')} method="post">
-                                            <button className="btn-dark" type="submit">Reject</button>
-                                        </form>
-                                    </td>
-                                </tr>
+                                <BookingActionRow key={b.id} booking={b} />
                             ))}
                         </tbody>
                     </table>

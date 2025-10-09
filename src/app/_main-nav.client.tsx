@@ -36,15 +36,24 @@ export default function MainNav() {
     } catch { /* ignore */ }
   }, []);
 
-  const isAdmin = role === 'admin';
+  const dashboardHref = role === 'admin' ? '/admin/analytics' : (guest ? '/dashboard/customer?guest=true' : '/dashboard/customer');
 
-  const dashboardHref = isAdmin ? '/admin' : (guest ? '/dashboard/customer?guest=true' : '/dashboard/customer');
+  async function handleHomeClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      window.location.href = '/';
+    } catch {
+      window.location.href = '/';
+    }
+  }
 
   return (
     <nav className="mainnav" aria-label="Primary">
-      {isAdmin && <a href="/contracts" data-transition>Contracts</a>}
+      <a href="/" onClick={handleHomeClick} data-transition>Home</a>
       <a href={dashboardHref} data-transition>Dashboard</a>
-      {isAdmin && <a href="/admin" data-transition>Admin</a>}
+  <a href="/manage-trucks" data-transition>Manage Trucks</a>
     </nav>
   );
 }
