@@ -1,0 +1,71 @@
+.manage-trucks-main {
+  max-width: 800px;
+  margin: 2rem auto;
+  background: #f6f6f6;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px #dedede;
+}
+.manage-trucks-main h1 {
+  text-align: center;
+  color: #ff4d00;
+  font-family: 'Cinzel', serif;
+}
+.truck-form {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.truck-form input, .truck-form select {
+  padding: 0.5rem;
+  border: 1px solid #dedede;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+.truck-form button {
+  background: #ff4d00;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.truck-form button:hover {
+  background: #d63c00;
+}
+.truck-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  box-shadow: 0 1px 4px #dedede;
+}
+.truck-table th, .truck-table td {
+  padding: 0.7rem 0.5rem;
+  border-bottom: 1px solid #dedede;
+  text-align: center;
+}
+.truck-table th {
+  background: #ff4d00;
+  color: #fff;
+  font-family: 'Cinzel', serif;
+}
+.truck-table tr:last-child td {
+  border-bottom: none;
+}
+.truck-table button {
+  background: #0ea5e9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.truck-table button:hover {
+  background: #0077b6;
+}

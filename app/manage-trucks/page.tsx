@@ -1,2 +1,6 @@
-// Re-export canonical Manage Trucks page from src/app
-export { default } from '@/src/app/manage-trucks/page';
+// Redirect to admin manage-trucks page
+import { redirect } from 'next/navigation';
+
+export default function ManageTrucksRedirect() {
+  redirect('/admin/manage-trucks');
+}

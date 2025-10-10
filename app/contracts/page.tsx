@@ -1,4 +1,4 @@
-export { default } from '@/src/app/contracts/page';
+export { default } from '../../src/app/contracts/page';
 
 
 

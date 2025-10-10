@@ -8,6 +8,7 @@ export type AdminAnalyticsProps = {
   distancePerMonth: { labels: string[]; values: number[] };
   revenuePerMonth: { labels: string[]; values: number[] };
   trucksByStatus: Record<string, number>;
+  profitLoss?: { labels: string[]; values: number[] };
 };
 
 export default function AdminAnalytics(props: AdminAnalyticsProps) {
@@ -17,6 +18,7 @@ export default function AdminAnalytics(props: AdminAnalyticsProps) {
     distancePerMonth: useRef<HTMLCanvasElement | null>(null),
     revenuePerMonth: useRef<HTMLCanvasElement | null>(null),
     trucksByStatus: useRef<HTMLCanvasElement | null>(null),
+    profitLoss: useRef<HTMLCanvasElement | null>(null),
   };
 
   function draw() {
@@ -91,6 +93,18 @@ export default function AdminAnalytics(props: AdminAnalyticsProps) {
       options: { plugins: { legend: { position: 'bottom' } } },
     });
 
+    // Profit / Loss (Line)
+    if (props.profitLoss) {
+      makeChart(refs.profitLoss.current, {
+        type: 'line',
+        data: {
+          labels: props.profitLoss.labels,
+          datasets: [{ label: 'Profit / Loss', data: props.profitLoss.values, borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,0.08)', tension: 0.3 }],
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: false } } },
+      });
+    }
+
     return () => { teardown.forEach((t) => t()); };
   }
 
@@ -119,6 +133,13 @@ export default function AdminAnalytics(props: AdminAnalyticsProps) {
         <div className="panel">
           <div className="panel-title">Trucks by Status</div>
           <canvas ref={refs.trucksByStatus} height={160} />
+        </div>
+      </section>
+
+      <section className="grid-1 mt-16">
+        <div className="panel">
+          <div className="panel-title">Profit / Loss</div>
+          <canvas ref={refs.profitLoss} height={160} />
         </div>
       </section>
 

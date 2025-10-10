@@ -1,4 +1,4 @@
-export { default } from '@/src/app/forgot-password/page';
+export { default } from '../../src/app/forgot-password/page';
 
 
 

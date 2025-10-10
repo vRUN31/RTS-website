@@ -6,7 +6,7 @@ import { createClient as createServerSupabase } from '@/utils/supabase/server';
 import LeafletMap from '@/src/components/map/LeafletMap.client';
 import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
 import BookingActionRow from '@/src/components/admin/BookingActionRow.client';
-import OpenAssignTruckModalListener from '../../components/admin/OpenAssignTruckModalListener.client';
+import OpenAssignTruckModalListener from '@/src/components/admin/OpenAssignTruckModalListener.client';
 
 export default async function AdminDashboard({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
     // SSR guard: only admins may access

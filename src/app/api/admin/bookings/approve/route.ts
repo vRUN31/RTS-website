@@ -4,8 +4,8 @@ import { createClient as createServerSupabase } from '@/utils/supabase/server';
 
 export async function POST(req: Request) {
   try {
-  const { bookingId, truckId } = await req.json();
-  console.log('[approve route] called with', { bookingId, truckId });
+    const { bookingId, truckId } = await req.json();
+    console.log('[api approve] called with', { bookingId, truckId });
     if (!bookingId || !truckId) return NextResponse.json({ error: 'bookingId and truckId required' }, { status: 400 });
 
     const cookieStore = await cookies();
@@ -24,7 +24,6 @@ export async function POST(req: Request) {
       .maybeSingle();
     if (bErr || !booking) return NextResponse.json({ error: bErr?.message || 'Booking not found' }, { status: 404 });
 
-    // Basic validation: truck should exist and not be offline/maintenance
     const { data: truck } = await supabase.from('trucks').select('id, status').eq('id', truckId).maybeSingle();
     if (!truck) return NextResponse.json({ error: 'Truck not found' }, { status: 404 });
     const badStatuses = ['offline','maintenance'];
@@ -32,7 +31,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Truck not available' }, { status: 400 });
     }
 
-    // Try to find an active contract for this client
     const today = new Date().toISOString().slice(0,10);
     const { data: contract } = await supabase
       .from('contracts')
@@ -42,14 +40,11 @@ export async function POST(req: Request) {
       .gte('end_at', today)
       .maybeSingle();
 
-    // TODO: compute ETA via routing service; for now, set ETA to pickup_date or +1 day
     const eta = booking.pickup_date ? new Date(booking.pickup_date) : new Date();
     if (!booking.pickup_date) eta.setDate(eta.getDate() + 1);
 
-    // Example placeholder cost: weight * 1000 (INR) unless estimated_cost present
     const cost = booking.estimated_cost ?? (booking.weight_mt ? Number(booking.weight_mt) * 1000 : null);
 
-    // Create a shipment and update booking
     const { data: shipment, error: sErr } = await supabase
       .from('shipments')
       .insert({
@@ -74,13 +69,12 @@ export async function POST(req: Request) {
       .eq('id', bookingId);
     if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
 
-    // Insert notification for the user
     try {
       await supabase.from('notifications').insert({
         user_id: booking.user_id,
         type: 'dispatch',
         channel: 'inapp',
-        payload: { bookingId, shipmentId: shipment?.id, message: 'Your booking was approved and a truck was assigned.' } as any,
+        payload: { bookingId, shipmentId: shipment?.id, message: 'Your booking was approved and a truck was assigned.' },
         status: 'queued'
       });
     } catch (e) { console.error('notify error', e); }

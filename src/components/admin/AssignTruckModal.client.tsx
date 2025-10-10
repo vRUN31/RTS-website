@@ -76,17 +76,30 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/admin/bookings/approve', {
+      const res = await fetch('/app/admin/bookings/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId, truckId: selected }),
       });
       if (!res.ok) {
-        const msg = await res.text();
+        // Try to parse JSON error first, otherwise use status text
+        let msg = `${res.status} ${res.statusText}`;
+        try {
+          const j = await res.json();
+          if (j && j.error) msg = String(j.error);
+        } catch (e) {
+          // not JSON, try short text (avoid dumping full HTML)
+          try {
+            const text = await res.text();
+            // keep only first 200 chars to avoid huge HTML blobs
+            msg = text ? (text.slice(0, 200) + (text.length > 200 ? '…' : '')) : msg;
+          } catch (_) {}
+        }
         throw new Error(msg || 'Failed to approve');
       }
       onAssigned();
     } catch (e: any) {
+      console.error('Assign error', e);
       setError(e?.message || 'Failed to approve');
     } finally {
       setLoading(false);
@@ -112,7 +125,7 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
                   checked={selected === t.id}
                   onChange={() => setSelected(t.id)}
                 />
-                <div className="list-col id">{String(t.id).slice(0,8)}…</div>
+                <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
                 <div className="list-col plate">{t.plate ?? '—'}</div>
                 <div className="list-col status">{t.status ?? '—'}</div>
                 <div className="list-col driver">
@@ -121,7 +134,11 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
                       <div className="driver-name">{t.driver.name}</div>
                       <div className="driver-small">{t.driver.phone} • Lic: {t.driver.license_no} (exp {t.driver.license_expiry ?? '—'})</div>
                     </>
-                  ) : (<div className="driver-name muted-small">No driver linked</div>)}
+                  ) : t.driver_id ? (
+                    <div className="driver-name muted-small">Driver record missing ({String(t.driver_id).slice(0,8)}…)</div>
+                  ) : (
+                    <div className="driver-name muted-small">No driver linked</div>
+                  )}
                 </div>
                 <div className="list-col updated">{t.last_updated?.slice(0,10) ?? '—'}</div>
               </label>
