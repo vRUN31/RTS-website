@@ -7,6 +7,7 @@ type Truck = {
   display_code: string; 
   plate: string; 
   status: string; 
+  vehicle_type?: string | null;
   location?: string | null; 
   driver_id?: string | null; 
   driver?: { 
@@ -21,7 +22,8 @@ export default function ManageTrucksClient() {
   const [newTruck, setNewTruck] = useState({ 
     display_code: "", 
     plate: "", 
-    status: "Running", 
+    status: "Running",
+    vehicle_type: "",
     driver_name: "", 
     driver_email: "", 
     driver_phone: "", 
@@ -31,6 +33,7 @@ export default function ManageTrucksClient() {
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null);
   const [editForm, setEditForm] = useState({
     status: "",
+    vehicle_type: "",
     driver_name: "",
     driver_phone: "",
     driver_email: "",
@@ -50,7 +53,7 @@ export default function ManageTrucksClient() {
       const supabase = createClient();
       const { data: trucksData } = await supabase
         .from('trucks')
-        .select('id, display_code, plate, status, location, driver_id')
+        .select('id, display_code, plate, status, vehicle_type, location, driver_id')
         .order('created_at', { ascending: false })
         .limit(1000);
 
@@ -141,6 +144,7 @@ export default function ManageTrucksClient() {
           display_code: newTruck.display_code,
           plate: newTruck.plate,
           status: newTruck.status.toLowerCase(),
+          vehicle_type: newTruck.vehicle_type || null,
           location: newTruck.location,
           driver_id: driverId,
           created_at: new Date().toISOString()
@@ -156,7 +160,8 @@ export default function ManageTrucksClient() {
       setNewTruck({ 
         display_code: "", 
         plate: "", 
-        status: "Running", 
+        status: "Running",
+        vehicle_type: "",
         driver_name: "", 
         driver_email: "", 
         driver_phone: "", 
@@ -166,7 +171,7 @@ export default function ManageTrucksClient() {
       // Reload the trucks list
       const { data: trucksData } = await supabase
         .from('trucks')
-        .select('id, display_code, plate, status, location, driver_id')
+        .select('id, display_code, plate, status, vehicle_type, location, driver_id')
         .order('created_at', { ascending: false })
         .limit(1000);
 
@@ -211,6 +216,7 @@ export default function ManageTrucksClient() {
     setEditingTruck(truck);
     setEditForm({
       status: truck.status,
+      vehicle_type: truck.vehicle_type || "",
       driver_name: truck.driver?.name || "",
       driver_phone: truck.driver?.phone || "",
       driver_email: "",
@@ -271,6 +277,7 @@ export default function ManageTrucksClient() {
         .from('trucks')
         .update({
           status: editForm.status.toLowerCase(),
+          vehicle_type: editForm.vehicle_type || null,
           location: editForm.location,
           driver_id: driverId,
           updated_at: new Date().toISOString()
@@ -282,7 +289,7 @@ export default function ManageTrucksClient() {
       // Reload the trucks list
       const { data: trucksData } = await supabase
         .from('trucks')
-        .select('id, display_code, plate, status, location, driver_id')
+        .select('id, display_code, plate, status, vehicle_type, location, driver_id')
         .order('created_at', { ascending: false })
         .limit(1000);
 
@@ -308,6 +315,7 @@ export default function ManageTrucksClient() {
       setEditingTruck(null);
       setEditForm({
         status: "",
+        vehicle_type: "",
         driver_name: "",
         driver_phone: "",
         driver_email: "",
@@ -472,6 +480,19 @@ export default function ManageTrucksClient() {
           placeholder="Plate Number"
           required
         />
+        <select 
+          name="vehicle_type" 
+          value={newTruck.vehicle_type} 
+          onChange={handleInputChange} 
+          className="vehicle-type-select"
+        >
+          <option value="">🚛 Select Vehicle Type (Optional)</option>
+          <option value="Pickup (1.5T)">🚐 Pickup (1.5T) - Light Cargo</option>
+          <option value="LCV (3.5T)">🚙 LCV (3.5T) - Light Commercial</option>
+          <option value="Truck (9T)">🚚 Truck (9T) - Medium Cargo</option>
+          <option value="Truck (16T)">🚛 Truck (16T) - Heavy Cargo</option>
+          <option value="Trailer (25T)">🚜 Trailer (25T) - Extra Heavy</option>
+        </select>
         <input
           name="driver_name"
           value={newTruck.driver_name}
@@ -527,6 +548,19 @@ export default function ManageTrucksClient() {
                 <option value="halt">⏸ Halt - Temporarily Stopped</option>
                 <option value="maintenance">🔧 Maintenance - Under Service</option>
               </select>
+              <select 
+                name="vehicle_type" 
+                value={editForm.vehicle_type} 
+                onChange={handleEditFormChange} 
+                className="vehicle-type-select"
+              >
+                <option value="">🚛 Select Vehicle Type (Optional)</option>
+                <option value="Pickup (1.5T)">🚐 Pickup (1.5T) - Light Cargo</option>
+                <option value="LCV (3.5T)">🚙 LCV (3.5T) - Light Commercial</option>
+                <option value="Truck (9T)">🚚 Truck (9T) - Medium Cargo</option>
+                <option value="Truck (16T)">🚛 Truck (16T) - Heavy Cargo</option>
+                <option value="Trailer (25T)">🚜 Trailer (25T) - Extra Heavy</option>
+              </select>
               <input
                 name="driver_name"
                 value={editForm.driver_name}
@@ -579,6 +613,7 @@ export default function ManageTrucksClient() {
               <tr>
                 <th>Truck Code</th>
                 <th>Plate</th>
+                <th>Vehicle Type</th>
                 <th>Status</th>
                 <th>Driver</th>
                 <th>Location</th>
@@ -590,6 +625,15 @@ export default function ManageTrucksClient() {
               <tr key={truck.id}>
                 <td>{truck.display_code ?? truck.id}</td>
                 <td>{truck.plate}</td>
+                <td>
+                  {truck.vehicle_type ? (
+                    <span className="vehicle-type-badge">
+                      {truck.vehicle_type}
+                    </span>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </td>
                 <td>
                   <span className={`status-badge status-${truck.status}`}>
                     {truck.status}

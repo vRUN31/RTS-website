@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import ThemeToggle from "../../../components/ThemeToggle.client";
 import "./admin-issues.css";
 
 interface Issue {
@@ -272,6 +273,7 @@ export default function AdminIssuesPage() {
 
   return (
     <div className="admin-issues-container">
+      <ThemeToggle />
       <div className="admin-issues-header">
         <h1>Issue Management</h1>
         <div className="header-stats">

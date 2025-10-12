@@ -234,12 +234,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             </div>
 
             <div className="mt-16 row-between">
-                <div className="row-gap-12">
-                    <a className="pill no-underline" href={`/admin?range=hour&grain=hour`}>Last Hour</a>
-                    <a className="pill no-underline" href={`/admin?range=day&grain=day`}>Last Day</a>
-                    <a className="pill no-underline" href={`/admin?range=month&grain=month`}>Last 6 Months</a>
-                    <a className="pill no-underline" href={`/admin?range=year&grain=month`}>Year to Date</a>
-                </div>
                 <form className="row-gap-12-center" action="/admin" method="get">
                     <input type="hidden" name="grain" value={grain} />
                     <label className="text-muted">

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import AdminChatInterface from '../../../components/admin/AdminChatInterface.client';
+import ThemeToggle from '../../../components/ThemeToggle.client';
 
 export default function AdminSupportPage() {
     const [userId, setUserId] = useState<string | null>(null);
@@ -66,6 +67,7 @@ export default function AdminSupportPage() {
 
     return (
         <main className="dashboard-container" style={{ maxWidth: '1600px' }}>
+            <ThemeToggle />
             <div className="row-center mb-24">
                 <h1 className="admin-welcome" style={{ margin: 0 }}>
                     💬 Support Chat Management

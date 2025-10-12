@@ -1134,3 +1134,116 @@
 .edit-form-container::-webkit-scrollbar-thumb:hover {
   background: #d63c00;
 }
+
+/* ========== VEHICLE TYPE SELECT - ENHANCED UI/UX ========== */
+
+.vehicle-type-select {
+  background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ff4d00' d='M10.293 3.293L6 7.586 1.707 3.293A1 1 0 00.293 4.707l5 5a1 1 0 001.414 0l5-5a1 1 0 10-1.414-1.414z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
+  padding-right: 48px;
+  position: relative;
+}
+
+.vehicle-type-select:hover {
+  border-color: var(--brand, #ff4d00);
+  box-shadow: 0 4px 16px rgba(255, 77, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.vehicle-type-select:focus {
+  outline: none;
+  border-color: var(--brand, #ff4d00);
+  box-shadow: 0 0 0 4px rgba(255, 77, 0, 0.1), 0 4px 16px rgba(255, 77, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.vehicle-type-select option {
+  padding: 12px;
+  font-weight: 500;
+  color: #333;
+  background: #fff;
+}
+
+.vehicle-type-select option:hover {
+  background: linear-gradient(135deg, #fff5f0 0%, #ffe8dc 100%);
+}
+
+[data-theme="dark"] .vehicle-type-select {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(30, 41, 59, 0.8) 100%);
+  border-color: rgba(255, 140, 97, 0.2);
+  color: #f8fafc;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .vehicle-type-select:hover {
+  border-color: rgba(255, 140, 97, 0.4);
+  box-shadow: 0 4px 16px rgba(255, 140, 97, 0.2), 0 0 20px rgba(255, 140, 97, 0.08);
+}
+
+[data-theme="dark"] .vehicle-type-select:focus {
+  border-color: #ff8c61;
+  box-shadow: 0 0 0 4px rgba(255, 140, 97, 0.15), 0 4px 16px rgba(255, 140, 97, 0.3);
+}
+
+[data-theme="dark"] .vehicle-type-select option {
+  background: #1a2332;
+  color: #f8fafc;
+}
+
+/* Vehicle Type Badge in Table */
+.vehicle-type-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  color: #1565c0;
+  border: 1px solid #90caf9;
+  box-shadow: 0 2px 4px rgba(21, 101, 192, 0.1);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.vehicle-type-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(21, 101, 192, 0.2);
+}
+
+[data-theme="dark"] .vehicle-type-badge {
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.15) 0%, rgba(33, 150, 243, 0.25) 100%);
+  color: #64b5f6;
+  border-color: rgba(100, 181, 246, 0.3);
+  box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+}
+
+[data-theme="dark"] .vehicle-type-badge:hover {
+  box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3), 0 0 12px rgba(33, 150, 243, 0.15);
+}
+
+/* Optional - Add icon animation to select */
+@keyframes select-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.vehicle-type-select:focus {
+  animation: select-bounce 0.6s ease;
+}
+

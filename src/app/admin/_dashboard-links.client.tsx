@@ -50,14 +50,24 @@ export default function AdminDashboardLinks({ userId }: AdminDashboardLinksProps
     }, [userId]);
 
     return (
-        <div className="text-center my-32" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div className="text-center my-32" style={{ 
+            display: 'flex', 
+            gap: '1rem', 
+            justifyContent: 'center', 
+            flexWrap: 'wrap',
+            alignItems: 'center'
+        }}>
             <a className="btn-dark no-underline btn-lg" href="/admin/analytics">
                 View Analytics & Charts
             </a>
             <a className="btn-dark no-underline btn-lg" href="/admin/fleet">
                 Fleet Management
             </a>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
+            <div style={{ 
+                position: 'relative', 
+                display: 'inline-flex',
+                alignItems: 'center'
+            }}>
                 <a className="btn-dark no-underline btn-lg" href="/admin/support">
                     Support Chat
                 </a>
@@ -68,7 +78,11 @@ export default function AdminDashboardLinks({ userId }: AdminDashboardLinksProps
                     />
                 )}
             </div>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
+            <div style={{ 
+                position: 'relative', 
+                display: 'inline-flex',
+                alignItems: 'center'
+            }}>
                 <a className="btn-dark no-underline btn-lg" href="/admin/issues">
                     ⚠️ Issue Management
                 </a>
