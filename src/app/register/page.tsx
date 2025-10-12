@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import ThemeToggle from '@/src/components/ThemeToggle.client';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
 const adminDomains = (process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
@@ -17,15 +19,17 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     return (
-        <main className="main-centered pos-relative">
-            <Link href="/" className="back-btn no-underline row-align pos-abs back-link">
-                <span className="back-pill">&larr;</span>
-                <span className="back-text">Back</span>
-            </Link>
-            <div className="logo-text">RTS</div>
-            <div className="card card-medium mt-16">
-                <div className="title text-dark mb-18">Sign Up</div>
-                <form
+        <>
+            <ThemeToggle />
+            <main className="main-centered pos-relative">
+                <Link href="/" className="back-btn no-underline row-align pos-abs back-link">
+                    <span className="back-pill">&larr;</span>
+                    <span className="back-text">Back</span>
+                </Link>
+                <div className="logo-text">RTS</div>
+                <div className="card card-medium mt-16">
+                    <div className="title text-dark mb-18">Sign Up</div>
+                    <form
                     onSubmit={async (e) => {
                         e.preventDefault();
                         setError(null);
@@ -93,5 +97,6 @@ export default function RegisterPage() {
                 </div>
             </div>
         </main>
+        </>
     );
 }

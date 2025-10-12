@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
+import ThemeToggle from '@/src/components/ThemeToggle.client';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
 const adminDomains = (process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
@@ -89,41 +91,44 @@ export default function LoginPage() {
     }
 
     return (
-        <main className="main-centered pos-relative">
-            <Link href="/" className="back-btn no-underline row-align pos-abs back-link">
-                <span className="back-pill">&larr;</span>
-                <span className="back-text">Back</span>
-            </Link>
-            <div className="logo-text">RTS</div>
-            <div className="card card-gradient card-compact">
-                <h4 className="title">Login</h4>
-                <h4 className="subtitle">{role === 'admin' ? 'Login for administrators and staff' : 'Login for clients and users'}</h4>
-                <form onSubmit={onSubmit} className="form-vertical">
-                    <div className="row-center">
-                        <label className={`pill ${role==='admin' ? 'is-active' : ''}`}>
-                            <input className="radio-hidden" type="radio" name="role" value="admin" checked={role==='admin'} onChange={() => setRole('admin')} />
-                            Admin
-                        </label>
-                        <label className={`pill ${role==='client' ? 'is-active' : ''}`}>
-                            <input className="radio-hidden" type="radio" name="role" value="client" checked={role==='client'} onChange={() => setRole('client')} />
-                            Client
-                        </label>
-                    </div>
-                    <input className="input-text" type="email" placeholder="Email" required value={email} onChange={e=>setEmail(e.target.value)} />
-                    <input className="input-text" type="password" placeholder="Password" required value={password} onChange={e=>setPassword(e.target.value)} />
-                    <div className="row-between">
-                        <label className="text-muted row-align">
-                            <input type="checkbox" /> Remember Me
-                        </label>
-                        <Link href="/forgot-password" className="link-primary">Forgot Password?</Link>
-                    </div>
-                    {error && <div className="text-center text-dim" role="alert">{error}</div>}
-                    <button className="btn-submit" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Continue'}</button>
-                    <div className="text-center text-muted mt-16">
-                        Don't have an account? <Link href="/register" className="link-primary">Sign Up</Link>
-                    </div>
-                </form>
-            </div>
-        </main>
+        <>
+            <ThemeToggle />
+            <main className="main-centered pos-relative">
+                <Link href="/" className="back-btn no-underline row-align pos-abs back-link">
+                    <span className="back-pill">&larr;</span>
+                    <span className="back-text">Back</span>
+                </Link>
+                <div className="logo-text">RTS</div>
+                <div className="card card-gradient card-compact">
+                    <h4 className="title">Login</h4>
+                    <h4 className="subtitle">{role === 'admin' ? 'Login for administrators and staff' : 'Login for clients and users'}</h4>
+                    <form onSubmit={onSubmit} className="form-vertical">
+                        <div className="row-center">
+                            <label className={`pill ${role==='admin' ? 'is-active' : ''}`}>
+                                <input className="radio-hidden" type="radio" name="role" value="admin" checked={role==='admin'} onChange={() => setRole('admin')} />
+                                Admin
+                            </label>
+                            <label className={`pill ${role==='client' ? 'is-active' : ''}`}>
+                                <input className="radio-hidden" type="radio" name="role" value="client" checked={role==='client'} onChange={() => setRole('client')} />
+                                Client
+                            </label>
+                        </div>
+                        <input className="input-text" type="email" placeholder="Email" required value={email} onChange={e=>setEmail(e.target.value)} />
+                        <input className="input-text" type="password" placeholder="Password" required value={password} onChange={e=>setPassword(e.target.value)} />
+                        <div className="row-between">
+                            <label className="text-muted row-align">
+                                <input type="checkbox" /> Remember Me
+                            </label>
+                            <Link href="/forgot-password" className="link-primary">Forgot Password?</Link>
+                        </div>
+                        {error && <div className="text-center text-dim" role="alert">{error}</div>}
+                        <button className="btn-submit" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Continue'}</button>
+                        <div className="text-center text-muted mt-16">
+                            Don't have an account? <Link href="/register" className="link-primary">Sign Up</Link>
+                        </div>
+                    </form>
+                </div>
+            </main>
+        </>
     );
 }

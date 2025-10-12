@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import ThemeToggle from '@/src/components/ThemeToggle.client';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
 
@@ -10,8 +12,10 @@ export default function ForgotPasswordPage() {
 	const [email, setEmail] = useState('');
 	const [error, setError] = useState<string | null>(null);
 	return (
-		<main className="main-centered">
-			<div className="logo-text">RTS</div>
+		<>
+			<ThemeToggle />
+			<main className="main-centered">
+				<div className="logo-text">RTS</div>
 			<div className="card card-medium mt-16">
 				<div className="title text-dark mb-18">Reset your password</div>
 				{!emailSent ? (
@@ -54,5 +58,6 @@ export default function ForgotPasswordPage() {
 				)}
 			</div>
 		</main>
+		</>
 	);
 }

@@ -1,5 +1,6 @@
 import { createClient as createServerSupabase } from "@/utils/supabase/server";
 import { cookies } from "next/headers";
+import ThemeToggle from "@/src/components/ThemeToggle.client";
 
 export default async function HomePage() {
     // Optional demo: pull todos if table exists; swallow errors silently
@@ -13,6 +14,7 @@ export default async function HomePage() {
 
     return (
         <>
+            <ThemeToggle />
             <header className="site-header">
                 <div className="truly">Delivering Trust, Safety, and Speed Across Every Journey</div>
             </header>

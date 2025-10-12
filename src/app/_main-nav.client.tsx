@@ -54,7 +54,7 @@ export default function MainNav() {
       {role !== 'admin' && <a href="/" onClick={handleHomeClick} data-transition>Home</a>}
       <a href={dashboardHref} data-transition>Dashboard</a>
     {role === 'admin' && <a href="/admin/analytics" data-transition>Analytics</a>}
-    <a href="/manage-trucks" data-transition>Manage Trucks</a>
+    {role === 'admin' && <a href="/admin/manage-trucks" data-transition>Manage Trucks</a>}
     </nav>
   );
 }

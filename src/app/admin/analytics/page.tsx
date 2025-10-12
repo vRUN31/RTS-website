@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createClient as createServerSupabase } from '@/utils/supabase/server';
 import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
+import AdminShell from '../_admin-shell.client';
 
 export default async function AnalyticsPage() {
   // server side metrics collection
@@ -45,10 +46,12 @@ export default async function AnalyticsPage() {
   const profitLoss = (await profitLossBy(grain)) ?? { labels: ['Jan','Feb','Mar'], values: [2000, 1500, -300] };
 
   return (
-    <main style={{ padding: '2rem' }}>
-      <h1 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '2rem' }}>Analytics</h1>
-      {/* @ts-ignore Server -> Client props passing */}
-  <AdminAnalytics shipmentsStatusCounts={shipmentsStatusCounts} shipmentsPerMonth={shipmentsPerMonth} distancePerMonth={distancePerMonth} revenuePerMonth={revenuePerMonth} trucksByStatus={trucksByStatus} profitLoss={profitLoss} />
-    </main>
+    <AdminShell>
+      <main style={{ padding: '2rem' }}>
+        <h1 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '2rem' }}>Analytics</h1>
+        {/* @ts-ignore Server -> Client props passing */}
+    <AdminAnalytics shipmentsStatusCounts={shipmentsStatusCounts} shipmentsPerMonth={shipmentsPerMonth} distancePerMonth={distancePerMonth} revenuePerMonth={revenuePerMonth} trucksByStatus={trucksByStatus} profitLoss={profitLoss} />
+      </main>
+    </AdminShell>
   );
 }

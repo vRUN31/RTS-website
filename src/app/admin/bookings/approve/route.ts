@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createClient as createServerSupabase } from '@/utils/supabase/server';
+import { createServerClient } from '@/src/utils/supabase/server';
 
 export async function POST(req: Request) {
   try {
@@ -8,8 +8,7 @@ export async function POST(req: Request) {
   console.log('[approve route] called with', { bookingId, truckId });
     if (!bookingId || !truckId) return NextResponse.json({ error: 'bookingId and truckId required' }, { status: 400 });
 
-    const cookieStore = await cookies();
-    const supabase = createServerSupabase(cookieStore as any);
+    const supabase = await createServerClient();
 
     // Ensure admin
     const { data: { user } } = await supabase.auth.getUser();
@@ -22,11 +21,17 @@ export async function POST(req: Request) {
       .select('id, client_id, source_city, destination_city, weight_mt, vehicle_type, pickup_date, material, user_id, estimated_cost')
       .eq('id', bookingId)
       .maybeSingle();
-    if (bErr || !booking) return NextResponse.json({ error: bErr?.message || 'Booking not found' }, { status: 404 });
+    if (bErr || !booking) {
+      console.error('[approve route] booking lookup failed', { err: bErr?.message, bookingId });
+      return NextResponse.json({ error: bErr?.message || 'Booking not found' }, { status: 404 });
+    }
 
     // Basic validation: truck should exist and not be offline/maintenance
-    const { data: truck } = await supabase.from('trucks').select('id, status').eq('id', truckId).maybeSingle();
-    if (!truck) return NextResponse.json({ error: 'Truck not found' }, { status: 404 });
+    const { data: truck, error: tErr } = await supabase.from('trucks').select('id, status').eq('id', truckId).maybeSingle();
+    if (tErr || !truck) {
+      console.error('[approve route] truck lookup failed', { err: tErr?.message, truckId });
+      return NextResponse.json({ error: tErr?.message || 'Truck not found' }, { status: 404 });
+    }
     const badStatuses = ['offline','maintenance'];
     if (truck.status && badStatuses.includes(String(truck.status).toLowerCase())) {
       return NextResponse.json({ error: 'Truck not available' }, { status: 400 });
@@ -66,13 +71,19 @@ export async function POST(req: Request) {
       })
       .select('id')
       .maybeSingle();
-    if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
+    if (sErr) {
+      console.error('[approve route] create shipment failed', sErr);
+      return NextResponse.json({ error: sErr.message }, { status: 500 });
+    }
 
     const { error: uErr } = await supabase
       .from('bookings')
       .update({ status: 'approved' })
       .eq('id', bookingId);
-    if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
+    if (uErr) {
+      console.error('[approve route] update booking failed', uErr);
+      return NextResponse.json({ error: uErr.message }, { status: 500 });
+    }
 
     // Insert notification for the user
     try {

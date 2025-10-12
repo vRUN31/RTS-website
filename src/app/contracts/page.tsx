@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import ThemeToggle from '@/src/components/ThemeToggle.client';
 
 type Contract = {
     id: string;
@@ -72,8 +73,10 @@ export default function ContractsPage() {
     const filtered = rows; // server-filtered above
 
         return (
-            <main className="dashboard-container">
-                <h1 className="dashboard-header">Contracts</h1>
+            <>
+                <ThemeToggle />
+                <main className="dashboard-container">
+                    <h1 className="dashboard-header">Contracts</h1>
                 <div className="row-between mt-16">
                     <div className="row-align row-gap-12">
                         <label htmlFor="contractsFilter">Filter:</label>
@@ -159,5 +162,6 @@ export default function ContractsPage() {
                 </table>
             )}
         </main>
+        </>
     );
 }

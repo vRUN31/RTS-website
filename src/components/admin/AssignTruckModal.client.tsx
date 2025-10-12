@@ -73,30 +73,56 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
 
   async function handleAssign() {
     if (!selected) return;
+    if (!confirm('Assign this truck and approve the booking?')) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/app/admin/bookings/approve', {
+      // Use absolute URL to avoid any routing issues
+      const url = `${window.location.origin}/api/bookings/approve`;
+      console.debug('[AssignTruck] POST', url, { bookingId, truckId: selected });
+      
+      const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ bookingId, truckId: selected }),
+        credentials: 'same-origin',
       });
+      
+      console.debug('[AssignTruck] Response status:', res.status);
+      console.debug('[AssignTruck] Response headers:', Object.fromEntries(res.headers.entries()));
+      
+      const text = await res.text();
+      console.debug('[AssignTruck] Response text:', text);
+      
       if (!res.ok) {
-        // Try to parse JSON error first, otherwise use status text
-        let msg = `${res.status} ${res.statusText}`;
+        let errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+        
+        // Try to parse as JSON
         try {
-          const j = await res.json();
-          if (j && j.error) msg = String(j.error);
+          const errorData = JSON.parse(text);
+          console.debug('[AssignTruck] Error response:', errorData);
+          errorMessage = errorData.error || errorMessage;
         } catch (e) {
-          // not JSON, try short text (avoid dumping full HTML)
-          try {
-            const text = await res.text();
-            // keep only first 200 chars to avoid huge HTML blobs
-            msg = text ? (text.slice(0, 200) + (text.length > 200 ? '…' : '')) : msg;
-          } catch (_) {}
+          // Response is not JSON (likely HTML error page)
+          console.error('[AssignTruck] Non-JSON response:', text.substring(0, 500));
+          errorMessage = 'Server returned an unexpected response. Check console for details.';
         }
-        throw new Error(msg || 'Failed to approve');
+        
+        throw new Error(errorMessage);
       }
+      
+      let result;
+      try {
+        result = JSON.parse(text);
+        console.debug('[AssignTruck] Success response:', result);
+      } catch (e) {
+        console.error('[AssignTruck] Could not parse success response as JSON:', text);
+        throw new Error('Server returned invalid JSON response');
+      }
+      
       onAssigned();
     } catch (e: any) {
       console.error('Assign error', e);

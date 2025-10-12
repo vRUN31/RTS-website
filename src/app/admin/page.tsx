@@ -7,6 +7,8 @@ import LeafletMap from '@/src/components/map/LeafletMap.client';
 import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
 import BookingActionRow from '@/src/components/admin/BookingActionRow.client';
 import OpenAssignTruckModalListener from '@/src/components/admin/OpenAssignTruckModalListener.client';
+import AdminShell from './_admin-shell.client';
+import AdminDashboardLinks from './_dashboard-links.client';
 
 export default async function AdminDashboard({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
     // SSR guard: only admins may access
@@ -209,12 +211,13 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     }
 
     return (
-        <main className="dashboard-container">
-            <div className="row-center my-32">
-                <h1 className="admin-welcome">
-                    Welcome back, Admin!!
-                </h1>
-            </div>
+        <AdminShell>
+            <main className="dashboard-container">
+                <div className="row-center my-32">
+                    <h1 className="admin-welcome">
+                        Welcome back, Admin!!
+                    </h1>
+                </div>
 
             {/* Quick filters and actions */}
             <div className="row-between mt-16">
@@ -285,10 +288,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                 <LeafletMap mode="admin" height={420} />
             </div>
 
-            {/* Link to analytics page */}
-            <div className="text-center my-32">
-                <a className="btn-dark no-underline btn-lg" href="/admin/analytics">View Analytics & Charts</a>
-            </div>
+            {/* Link to analytics page, Fleet Management, and Support Chat */}
+            <AdminDashboardLinks userId={user.id} />
 
             <section className="panel mt-16">
                 <div className="panel-title">Recent Shipments</div>
@@ -357,6 +358,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             {/* Page-level modal handler to avoid rendering inside <tbody> */}
             <OpenAssignTruckModalListener />
         </main>
+        </AdminShell>
     );
 }
 
