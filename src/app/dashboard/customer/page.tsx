@@ -419,6 +419,11 @@ export default function CustomerDashboardPage() {
                                         setPlaceError('Supabase env is not configured.');
                                         return;
                                     }
+                                    // Validate that source and destination are provided
+                                    if (!form.source_city || !form.destination_city) {
+                                        setPlaceError('Please enter both source and destination cities.');
+                                        return;
+                                    }
                                     // Allow submission even if client_id is not set; we'll bind to user_id and let RLS policy permit it.
                                     try {
                                         setPlacing(true);
@@ -449,8 +454,24 @@ export default function CustomerDashboardPage() {
                                         setPlacing(false);
                                     }
                                 }}>
-                                    <input className="filter-input" placeholder="Source City" value={form.source_city} onChange={(e) => setForm({ ...form, source_city: e.target.value })} required aria-label="Source City" />
-                                    <input className="filter-input" placeholder="Destination City" value={form.destination_city} onChange={(e) => setForm({ ...form, destination_city: e.target.value })} required aria-label="Destination City" />
+                                    {/* Source and Destination Text Fields */}
+                                    <input 
+                                        className="filter-input" 
+                                        placeholder="Source City (e.g., Mumbai)" 
+                                        value={form.source_city} 
+                                        onChange={(e) => setForm({ ...form, source_city: e.target.value })} 
+                                        aria-label="Source City"
+                                        required
+                                    />
+                                    <input 
+                                        className="filter-input" 
+                                        placeholder="Destination City (e.g., Delhi)" 
+                                        value={form.destination_city} 
+                                        onChange={(e) => setForm({ ...form, destination_city: e.target.value })} 
+                                        aria-label="Destination City"
+                                        required
+                                    />
+                                    
                                     <select className="filter-input" aria-label="Vehicle Type" value={form.vehicle_type} onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })} required>
                                         <option value="">Select Vehicle Type</option>
                                         <option value="Pickup (1.5T)">Pickup (1.5T)</option>
@@ -765,7 +786,7 @@ export default function CustomerDashboardPage() {
                         <div className={`panel ${styles.panelCenter}`} id="help-resources">
                             <div className="panel-title">📚 Help Resources</div>
                             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
+                                <a href="/user-guide" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}>
                                     📖 <span>User Guide</span>

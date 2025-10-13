@@ -1,0 +1,382 @@
+/* Route Booking Component Styles */
+
+.routeBooking {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Input Card */
+.inputCard {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  transition: box-shadow 0.3s ease;
+}
+
+.inputCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Input Group */
+.inputGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* Icon Box */
+.iconBox {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(255, 77, 0, 0.12), rgba(255, 77, 0, 0.06));
+  border-radius: 12px;
+  font-size: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.inputGroup:hover .iconBox {
+  background: linear-gradient(135deg, rgba(255, 77, 0, 0.18), rgba(255, 77, 0, 0.1));
+  transform: scale(1.05);
+}
+
+/* Input Wrapper */
+.inputWrapper {
+  position: relative;
+  flex: 1;
+}
+
+/* Input Field */
+.input {
+  width: 100%;
+  padding: 16px 18px;
+  font-size: 1rem;
+  color: var(--text, #1a1a1a);
+  background: var(--input-bg, #fafafa);
+  border: 2px solid var(--border, #e5e5e5);
+  border-radius: 12px;
+  outline: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+.input::placeholder {
+  color: var(--text-dim, #999);
+}
+
+.input:hover {
+  border-color: #d0d0d0;
+  background: var(--input-hover, #f5f5f5);
+}
+
+.input:focus {
+  border-color: #ff4d00;
+  background: var(--card, #ffffff);
+  box-shadow: 0 0 0 4px rgba(255, 77, 0, 0.1);
+}
+
+.input.inputSuccess {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+/* Loader Icon */
+.loader {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Dropdown Suggestions */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e5e5);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+  animation: dropdownFadeIn 0.2s ease;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdownItem {
+  padding: 14px 16px;
+  font-size: 0.95rem;
+  color: var(--text, #1a1a1a);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+  transition: all 0.2s ease;
+}
+
+.dropdownItem:last-child {
+  border-bottom: none;
+}
+
+.dropdownItem:hover {
+  background: linear-gradient(to right, rgba(255, 77, 0, 0.08), rgba(255, 77, 0, 0.03));
+  color: #ff4d00;
+}
+
+/* Custom Scrollbar for Dropdown */
+.dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dropdown::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Route Info Card */
+.routeInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(255, 77, 0, 0.1), rgba(255, 77, 0, 0.05));
+  border-left: 4px solid #ff4d00;
+  border-radius: 10px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.calculating {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--text, #1a1a1a);
+}
+
+.spinner {
+  display: inline-block;
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.routeStat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statLabel {
+  font-size: 0.813rem;
+  font-weight: 600;
+  color: var(--text-dim, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #ff4d00;
+  line-height: 1;
+}
+
+.clearBtn {
+  padding: 10px 18px;
+  background: var(--card, #ffffff);
+  color: var(--text, #1a1a1a);
+  border: 2px solid var(--border, #dedede);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.clearBtn:hover {
+  background: #ff4d00;
+  color: white;
+  border-color: #ff4d00;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 77, 0, 0.2);
+}
+
+.clearBtn:active {
+  transform: translateY(0);
+}
+
+/* Map Container */
+.mapContainer {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--border, #dedede);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  position: relative;
+  background: var(--card, #f5f5f5);
+}
+
+.mapLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 1rem;
+  color: var(--text-dim, #666);
+  font-weight: 600;
+}
+
+/* Dark Mode Support */
+[data-theme="dark"] .inputCard {
+  background: var(--card, #1e1e1e);
+  border-color: var(--border, #333);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .input {
+  background: var(--input-bg, #2a2a2a);
+  color: var(--text, #e5e5e5);
+  border-color: var(--border, #444);
+}
+
+[data-theme="dark"] .input:hover {
+  background: var(--input-hover, #333);
+  border-color: #555;
+}
+
+[data-theme="dark"] .input:focus {
+  background: var(--card, #1e1e1e);
+}
+
+[data-theme="dark"] .dropdown {
+  background: var(--card, #1e1e1e);
+  border-color: var(--border, #333);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .dropdownItem {
+  color: var(--text, #e5e5e5);
+  border-color: var(--border-light, #2a2a2a);
+}
+
+[data-theme="dark"] .dropdownItem:hover {
+  background: linear-gradient(to right, rgba(255, 77, 0, 0.15), rgba(255, 77, 0, 0.08));
+}
+
+[data-theme="dark"] .clearBtn {
+  background: var(--card, #2a2a2a);
+  color: var(--text, #e5e5e5);
+  border-color: var(--border, #444);
+}
+
+[data-theme="dark"] .mapContainer {
+  border-color: var(--border, #333);
+  background: var(--card, #1e1e1e);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .inputCard {
+    padding: 18px;
+  }
+  
+  .inputGroup {
+    gap: 10px;
+  }
+  
+  .iconBox {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    font-size: 1.25rem;
+  }
+  
+  .input {
+    padding: 14px 16px;
+    font-size: 0.938rem;
+  }
+  
+  .routeInfo {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .statValue {
+    font-size: 1.125rem;
+  }
+  
+  .clearBtn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .inputCard {
+    padding: 16px;
+    gap: 16px;
+  }
+  
+  .routeInfo {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .routeStat {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
