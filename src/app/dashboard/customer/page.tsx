@@ -497,7 +497,32 @@ export default function CustomerDashboardPage() {
                         </div>
 
                         <div className={`panel ${styles.panelCenter}`} id="my-bookings">
-                            <div className="panel-title">My Bookings</div>
+                            <div className="panel-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span>My Bookings</span>
+                                <a 
+                                    href="/bookings" 
+                                    style={{ 
+                                        fontSize: '14px', 
+                                        fontWeight: 600, 
+                                        color: 'var(--brand)', 
+                                        textDecoration: 'none',
+                                        padding: '6px 12px',
+                                        borderRadius: '6px',
+                                        background: 'rgba(255, 77, 0, 0.1)',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(255, 77, 0, 0.2)';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                    }}
+                                >
+                                    View All →
+                                </a>
+                            </div>
                             <div className="text-primary leading-17 mb-18">Requests you submitted for approval. Approved bookings appear later as shipments.</div>
                             {bookingsLoading && <div style={{ padding: '20px', textAlign: 'center' }}>
                                 <div className={styles.loadingSpinner} style={{ margin: '0 auto 10px' }}></div>

@@ -34,7 +34,7 @@ export default async function HomePage() {
                         </div>
                     </div>
                     <div className="guest-section">
-                        <h4>Just want to explore? No Problem.<br />Continue as,</h4>
+                        <h4>Just want to explore? No Problem. Continue as,</h4>
                         <a data-transition href="/dashboard/customer?guest=true" className="cta-ghost">Guest</a>
                     </div>
                 </div>
