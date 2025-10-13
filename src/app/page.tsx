@@ -46,7 +46,7 @@ export default async function HomePage() {
                     </ul>
                 )}
             </main>
-            <footer className="text-center mt-32">
+            {/* <footer className="text-center mt-32">
                 <div className="footer-grid">
                     <div>&copy; RTS. All rights reserved.</div>
                     <div className="footer-contact">
@@ -56,7 +56,7 @@ export default async function HomePage() {
                         <div className="muted-small">Address: 12, Industrial Estate, Chennai, Tamil Nadu, India</div>
                     </div>
                 </div>
-            </footer>
+            </footer> */}
         </>
     );
 }
