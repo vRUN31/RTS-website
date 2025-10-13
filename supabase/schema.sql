@@ -97,6 +97,9 @@ create index if not exists idx_profiles_email on profiles(email);
 create table if not exists clients (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  email text,
+  phone text,
+  company text,
   contacts jsonb,
   gst text,
   billing_terms text,
@@ -129,6 +132,22 @@ drop policy if exists "contracts admin read" on public.contracts;
 create policy "contracts admin read" on public.contracts for select using (
   public.is_admin(auth.uid())
 );
+
+drop policy if exists "contracts admin insert" on public.contracts;
+create policy "contracts admin insert" on public.contracts for insert with check (
+  public.is_admin(auth.uid())
+);
+
+drop policy if exists "contracts admin update" on public.contracts;
+create policy "contracts admin update" on public.contracts for update using (
+  public.is_admin(auth.uid())
+) with check (public.is_admin(auth.uid()));
+
+drop policy if exists "contracts admin delete" on public.contracts;
+create policy "contracts admin delete" on public.contracts for delete using (
+  public.is_admin(auth.uid())
+);
+
 drop policy if exists "contracts client read" on public.contracts;
 create policy "contracts client read" on public.contracts for select using (
   exists (
