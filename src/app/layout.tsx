@@ -4,6 +4,7 @@ import './globals.css';
 import Effects from './_effects.client';
 import TopBar from './_topbar.client';
 import HideableTopBar from './_hideable-topbar.client';
+import AuthInit from './_auth-init.client';
 
 export const metadata: Metadata = {
     title: 'Raj Mohan Transport Services',
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
              />
          </head>
          <body>
+             <AuthInit />
              <Effects />
              <HideableTopBar />
              <main className="app-main">

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import dynamic from 'next/dynamic';
 import styles from './dashboard.module.css';
+import EnhancedBookingForm from '@/src/components/booking/EnhancedBookingForm';
 
 const LeafletMap = dynamic(() => import('@/src/components/map/LeafletMap.client'), { ssr: false });
 const InstagramChat = dynamic(() => import('@/src/components/chat/InstagramChat.client'), { ssr: false });
@@ -454,44 +455,15 @@ export default function CustomerDashboardPage() {
                                         setPlacing(false);
                                     }
                                 }}>
-                                    {/* Source and Destination Text Fields */}
-                                    <input 
-                                        className="filter-input" 
-                                        placeholder="Source City (e.g., Mumbai)" 
-                                        value={form.source_city} 
-                                        onChange={(e) => setForm({ ...form, source_city: e.target.value })} 
-                                        aria-label="Source City"
-                                        required
+                                    {/* Enhanced Booking Form with Optional Map */}
+                                    <EnhancedBookingForm
+                                        form={form}
+                                        setForm={setForm}
+                                        placing={placing}
+                                        placeError={placeError}
+                                        placeSuccess={placeSuccess}
+                                        onCancel={() => { setShowPlaceOrder(false); setPlaceError(null); }}
                                     />
-                                    <input 
-                                        className="filter-input" 
-                                        placeholder="Destination City (e.g., Delhi)" 
-                                        value={form.destination_city} 
-                                        onChange={(e) => setForm({ ...form, destination_city: e.target.value })} 
-                                        aria-label="Destination City"
-                                        required
-                                    />
-                                    
-                                    <select className="filter-input" aria-label="Vehicle Type" value={form.vehicle_type} onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })} required>
-                                        <option value="">Select Vehicle Type</option>
-                                        <option value="Pickup (1.5T)">Pickup (1.5T)</option>
-                                        <option value="LCV (3.5T)">LCV (3.5T)</option>
-                                        <option value="Truck (9T)">Truck (9T)</option>
-                                        <option value="Truck (16T)">Truck (16T)</option>
-                                        <option value="Trailer (25T)">Trailer (25T)</option>
-                                    </select>
-                                    <input className="filter-input" placeholder="Material" value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} aria-label="Material" />
-                                    <input className="filter-input" placeholder="Weight (MT)" type="number" step="0.01" value={form.weight_mt} onChange={(e) => setForm({ ...form, weight_mt: e.target.value })} aria-label="Weight (MT)" />
-                                    <input className="filter-input" placeholder="Pickup Date" type="date" value={form.pickup_date} onChange={(e) => setForm({ ...form, pickup_date: e.target.value })} aria-label="Pickup Date" />
-                                    <input className="filter-input" placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} aria-label="Notes" />
-                                    <div className="row-gap-12">
-                                        <button className={`btn-dark ${styles.enhancedButton}`} type="submit" disabled={placing}>
-                                            {placing ? '⏳ Submitting…' : '✅ Submit Booking'}
-                                        </button>
-                                        <button className="btn-dark" type="button" onClick={() => { setShowPlaceOrder(false); setPlaceError(null); }}>Cancel</button>
-                                    </div>
-                                    {placeError && <div role="alert" className={styles.errorMessage}>❌ {placeError}</div>}
-                                    {placeSuccess && <div role="status" className={styles.successMessage}>✅ {placeSuccess}</div>}
                                 </form>
                             )}
                         </div>
