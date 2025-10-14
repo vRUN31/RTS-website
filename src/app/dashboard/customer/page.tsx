@@ -68,6 +68,9 @@ export default function CustomerDashboardPage() {
         pickup_date: '',
         notes: '',
     });
+    // Route data from map (distance in km, duration in seconds)
+    const [routeDistance, setRouteDistance] = useState<number>(0);
+    const [routeDuration, setRouteDuration] = useState<number>(0);
     // Rate calculator state
     const [rateVehicle, setRateVehicle] = useState('Pickup (1.5T)');
     const [rateDistance, setRateDistance] = useState('');
@@ -441,11 +444,17 @@ export default function CustomerDashboardPage() {
                                             pickup_date: form.pickup_date || null,
                                             notes: form.notes.trim() || null,
                                             status: 'submitted' as const,
+                                            // Include route data from map if available
+                                            estimated_distance: routeDistance > 0 ? routeDistance : null,
+                                            estimated_duration: routeDuration > 0 ? routeDuration : null,
                                         };
                                         const { error } = await supabase.from('bookings').insert(payload);
                                         if (error) throw error;
                                         setPlaceSuccess('Booking submitted! Our team will review and confirm.');
                                         setForm({ source_city: '', destination_city: '', vehicle_type: '', material: '', weight_mt: '', pickup_date: '', notes: '' });
+                                        // Clear route data
+                                        setRouteDistance(0);
+                                        setRouteDuration(0);
                                         setShowPlaceOrder(false);
                                         // Trigger a refresh of the bookings list
                                         setReloadBookings((x) => x + 1);
@@ -463,6 +472,10 @@ export default function CustomerDashboardPage() {
                                         placeError={placeError}
                                         placeSuccess={placeSuccess}
                                         onCancel={() => { setShowPlaceOrder(false); setPlaceError(null); }}
+                                        onRouteCalculated={(distance, duration) => {
+                                            setRouteDistance(distance);
+                                            setRouteDuration(duration);
+                                        }}
                                     />
                                 </form>
                             )}

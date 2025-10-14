@@ -30,6 +30,8 @@ The map interface component that provides:
 ✅ **Smart Search**: OpenStreetMap Nominatim provides intelligent place suggestions
 ✅ **Route Visualization**: See the driving route on the map
 ✅ **Distance & Duration**: Displays calculated route metrics
+✅ **Real-Time Pricing**: Automatic price estimation based on distance and vehicle type
+✅ **Price Breakdown**: Detailed breakdown showing base price, GST, toll, and loading charges
 ✅ **No SSR Issues**: Uses dynamic imports to prevent Leaflet SSR errors
 ✅ **Graceful Fallback**: If map fails, text mode still works perfectly
 ✅ **No API Keys Required**: Uses free OpenStreetMap services
@@ -56,6 +58,9 @@ The enhanced form is integrated into the customer dashboard at `/dashboard/custo
    - See the route automatically calculated
    - Distance and duration displayed below the map
    - Text fields automatically populated with selected cities
+   - **Select vehicle type to see estimated price**
+   - Price breakdown shows base cost, GST, toll, and loading charges
+   - Compare prices across different vehicle types
 
 ## API Keys
 

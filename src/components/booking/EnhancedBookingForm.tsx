@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type MapBookingViewComponent from './MapBookingView';
+import { calculatePrice, formatPrice, type PriceBreakdown } from '@/src/utils/pricing';
 
 // Dynamically import the map component (client-only)
 const MapBookingView = dynamic<React.ComponentProps<typeof MapBookingViewComponent>>(
@@ -58,6 +59,8 @@ interface EnhancedBookingFormProps {
   placeError: string | null;
   placeSuccess: string | null;
   onCancel: () => void;
+  // Callback to pass route data back to parent
+  onRouteCalculated?: (distance: number, duration: number) => void;
 }
 
 export default function EnhancedBookingForm({
@@ -66,13 +69,26 @@ export default function EnhancedBookingForm({
   placing,
   placeError,
   placeSuccess,
-  onCancel
+  onCancel,
+  onRouteCalculated
 }: EnhancedBookingFormProps) {
   const [useMapMode, setUseMapMode] = useState(false);
   const [sourceLocation, setSourceLocation] = useState<LocationData | null>(null);
   const [destLocation, setDestLocation] = useState<LocationData | null>(null);
   const [route, setRoute] = useState<RouteData | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [priceEstimate, setPriceEstimate] = useState<PriceBreakdown | null>(null);
+
+  // Calculate price when route and vehicle type change
+  useEffect(() => {
+    if (route && form.vehicle_type) {
+      const distanceInKm = route.distance / 1000;
+      const price = calculatePrice(distanceInKm, form.vehicle_type);
+      setPriceEstimate(price);
+    } else {
+      setPriceEstimate(null);
+    }
+  }, [route, form.vehicle_type]);
 
   // Update text fields when locations are selected
   useEffect(() => {
@@ -116,11 +132,17 @@ export default function EnhancedBookingForm({
 
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
         const routeData = data.routes[0];
-        setRoute({
+        const newRoute = {
           distance: routeData.distance,
           duration: routeData.duration,
           geometry: routeData.geometry.coordinates.map((coord: number[]) => [coord[0], coord[1]]),
-        });
+        };
+        setRoute(newRoute);
+        
+        // Pass route data back to parent component
+        if (onRouteCalculated) {
+          onRouteCalculated(newRoute.distance / 1000, newRoute.duration); // distance in km, duration in seconds
+        }
       } else {
         throw new Error('No route found');
       }
@@ -128,6 +150,11 @@ export default function EnhancedBookingForm({
       console.error('Route fetch error:', error);
       setMapError('Could not calculate route. Please check your locations.');
       setRoute(null);
+      
+      // Clear route data in parent
+      if (onRouteCalculated) {
+        onRouteCalculated(0, 0);
+      }
     }
   };
 
@@ -261,6 +288,109 @@ export default function EnhancedBookingForm({
           <option value="Truck (16T)">Truck (16T)</option>
           <option value="Trailer (25T)">Trailer (25T)</option>
         </select>
+
+        {/* Price Estimation Display */}
+        {priceEstimate && (
+          <div style={{
+            marginTop: '8px',
+            padding: '16px',
+            background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+            border: '2px solid #ff9800',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(255, 152, 0, 0.15)'
+          }}>
+            <div style={{
+              fontSize: '0.875rem',
+              color: '#e65100',
+              fontWeight: 600,
+              marginBottom: '12px',
+              textAlign: 'center',
+              letterSpacing: '0.5px'
+            }}>
+              💰 ESTIMATED PRICE BREAKDOWN
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Base Price */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #ffcc80' }}>
+                <span style={{ fontSize: '0.875rem', color: '#e65100' }}>
+                  Base Price ({priceEstimate.distance} km × ₹{priceEstimate.perKm}/km)
+                </span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#e65100' }}>
+                  {formatPrice(priceEstimate.basePrice)}
+                </span>
+              </div>
+
+              {/* GST */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #ffcc80' }}>
+                <span style={{ fontSize: '0.875rem', color: '#e65100' }}>GST (18%)</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#e65100' }}>
+                  {formatPrice(priceEstimate.gst)}
+                </span>
+              </div>
+
+              {/* Toll */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #ffcc80' }}>
+                <span style={{ fontSize: '0.875rem', color: '#e65100' }}>Toll Charges (Est.)</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#e65100' }}>
+                  {formatPrice(priceEstimate.toll)}
+                </span>
+              </div>
+
+              {/* Loading */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '2px solid #ff9800' }}>
+                <span style={{ fontSize: '0.875rem', color: '#e65100' }}>Loading/Unloading</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#e65100' }}>
+                  {formatPrice(priceEstimate.loading)}
+                </span>
+              </div>
+
+              {/* Total */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '12px 0 0',
+                marginTop: '4px'
+              }}>
+                <span style={{ fontSize: '1.125rem', fontWeight: 700, color: '#bf360c' }}>
+                  TOTAL AMOUNT
+                </span>
+                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#bf360c' }}>
+                  {formatPrice(priceEstimate.total)}
+                </span>
+              </div>
+            </div>
+
+            {/* Disclaimer */}
+            <div style={{
+              marginTop: '12px',
+              padding: '8px',
+              background: 'rgba(255, 255, 255, 0.7)',
+              borderRadius: '6px',
+              fontSize: '0.75rem',
+              color: '#e65100',
+              textAlign: 'center',
+              lineHeight: '1.4'
+            }}>
+              ℹ️ This is an estimated price. Final charges may vary based on actual route, tolls, and other factors.
+            </div>
+          </div>
+        )}
+
+        {/* Show prompt to select vehicle if route exists but no vehicle selected */}
+        {route && !form.vehicle_type && (
+          <div style={{
+            padding: '12px',
+            background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+            border: '2px solid #2196f3',
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            color: '#0d47a1',
+            textAlign: 'center'
+          }}>
+            👆 <strong>Select a vehicle type</strong> above to see the estimated price
+          </div>
+        )}
 
         <input 
           className="filter-input" 

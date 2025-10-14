@@ -2,6 +2,16 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
+export type TruckProfitLoss = {
+  truck_id: string;
+  truck_code: string;
+  plate: string;
+  total_revenue: number;
+  total_cost: number;
+  profit_loss: number;
+  shipment_count: number;
+};
+
 export type AnalyticsData = {
   shipmentsStatusCounts: Record<string, number>;
   shipmentsPerMonth: { labels: string[]; values: number[] };
@@ -9,6 +19,15 @@ export type AnalyticsData = {
   revenuePerMonth: { labels: string[]; values: number[] };
   trucksByStatus: Record<string, number>;
   profitLoss?: { labels: string[]; values: number[] };
+  truckProfitLoss?: TruckProfitLoss[];
+  performanceSummary?: {
+    total_trucks: number;
+    profitable_trucks: number;
+    loss_making_trucks: number;
+    total_profit: number;
+    total_loss: number;
+    net_profit_loss: number;
+  };
 };
 
 export function useAnalyticsData() {
@@ -73,13 +92,23 @@ export function useAnalyticsData() {
           values: []
         };
 
+        // Fetch truck profit/loss
+        const { data: truckProfitLossData } = await supabase.rpc('profit_loss_per_truck');
+        const truckProfitLoss = (truckProfitLossData as TruckProfitLoss[]) || [];
+
+        // Fetch performance summary
+        const { data: summaryData } = await supabase.rpc('truck_performance_summary');
+        const performanceSummary = summaryData?.[0] || null;
+
         setData({
           trucksByStatus,
           shipmentsStatusCounts,
           shipmentsPerMonth,
           distancePerMonth,
           revenuePerMonth,
-          profitLoss
+          profitLoss,
+          truckProfitLoss,
+          performanceSummary
         });
         setLoading(false);
       } catch (err: any) {

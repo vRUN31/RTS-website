@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
+import TripConfirmationModal from './TripConfirmationModal.client';
 
 type TruckRow = {
   id: string;
@@ -29,6 +30,8 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [container, setContainer] = useState<HTMLElement | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [booking, setBooking] = useState<any>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -48,6 +51,16 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
     (async () => {
       setError(null);
       const supabase = createClient();
+      
+      // Fetch booking details
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .single();
+      
+      if (mounted && bookingData) setBooking(bookingData);
+      
       // Fetch trucks and drivers separately to avoid RLS joins
       const { data: trucksList } = await supabase
         .from('trucks')
@@ -69,11 +82,14 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
       if (mounted) setTrucks(rows);
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [bookingId]);
 
-  async function handleAssign() {
+  async function handleAssignClick() {
     if (!selected) return;
-    if (!confirm('Assign this truck and approve the booking?')) return;
+    setShowConfirmation(true);
+  }
+
+  async function handleConfirmApproval() {
     setLoading(true);
     setError(null);
     try {
@@ -127,57 +143,84 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
     } catch (e: any) {
       console.error('Assign error', e);
       setError(e?.message || 'Failed to approve');
+      setShowConfirmation(false);
     } finally {
       setLoading(false);
     }
   }
 
+  const selectedTruck = trucks.find(t => t.id === selected);
+
   const overlay = (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Assign Truck">
-      <div className="modal-container">
-        <div className="modal-header">
-          <div className="modal-title">Assign a Truck</div>
-          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
-        </div>
-        <div className="modal-body">
-          {error && <div className="error-banner">{error}</div>}
-          <div className="list-scroll">
-            {trucks.map(t => (
-              <label key={t.id} className={`list-row ${selected === t.id ? 'selected' : ''}`}>
-                <input
-                  type="radio"
-                  name="truck"
-                  value={t.id}
-                  checked={selected === t.id}
-                  onChange={() => setSelected(t.id)}
-                />
-                <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
-                <div className="list-col plate">{t.plate ?? '—'}</div>
-                <div className="list-col status">{t.status ?? '—'}</div>
-                <div className="list-col driver">
-                  {t.driver ? (
-                    <>
-                      <div className="driver-name">{t.driver.name}</div>
-                      <div className="driver-small">{t.driver.phone} • Lic: {t.driver.license_no} (exp {t.driver.license_expiry ?? '—'})</div>
-                    </>
-                  ) : t.driver_id ? (
-                    <div className="driver-name muted-small">Driver record missing ({String(t.driver_id).slice(0,8)}…)</div>
-                  ) : (
-                    <div className="driver-name muted-small">No driver linked</div>
-                  )}
-                </div>
-                <div className="list-col updated">{t.last_updated?.slice(0,10) ?? '—'}</div>
-              </label>
-            ))}
+    <>
+      <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Assign Truck">
+        <div className="modal-container">
+          <div className="modal-header">
+            <div className="modal-title">Assign a Truck</div>
+            <button className="modal-close" onClick={onClose} aria-label="Close" disabled={showConfirmation}>×</button>
+          </div>
+          <div className="modal-body">
+            {error && <div className="error-banner">{error}</div>}
+            <div className="list-scroll">
+              {trucks.map(t => (
+                <label key={t.id} className={`list-row ${selected === t.id ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="truck"
+                    value={t.id}
+                    checked={selected === t.id}
+                    onChange={() => setSelected(t.id)}
+                    disabled={showConfirmation}
+                  />
+                  <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
+                  <div className="list-col plate">{t.plate ?? '—'}</div>
+                  <div className="list-col status">{t.status ?? '—'}</div>
+                  <div className="list-col driver">
+                    {t.driver ? (
+                      <>
+                        <div className="driver-name">{t.driver.name}</div>
+                        <div className="driver-small">{t.driver.phone} • Lic: {t.driver.license_no} (exp {t.driver.license_expiry ?? '—'})</div>
+                      </>
+                    ) : t.driver_id ? (
+                      <div className="driver-name muted-small">Driver record missing ({String(t.driver_id).slice(0,8)}…)</div>
+                    ) : (
+                      <div className="driver-name muted-small">No driver linked</div>
+                    )}
+                  </div>
+                  <div className="list-col updated">{t.last_updated?.slice(0,10) ?? '—'}</div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn-dark" disabled={!selected || loading || showConfirmation} onClick={handleAssignClick}>
+              {loading ? 'Processing…' : 'Continue to Confirmation'}
+            </button>
           </div>
         </div>
-        <div className="modal-footer">
-          <button className="btn-dark" disabled={!selected || loading} onClick={handleAssign}>
-            {loading ? 'Assigning…' : 'Assign & Approve'}
-          </button>
-        </div>
       </div>
-    </div>
+      
+      {/* Trip Confirmation Modal */}
+      {showConfirmation && selectedTruck && booking && (
+        <TripConfirmationModal
+          bookingId={bookingId}
+          truckId={selected!}
+          truckPlate={selectedTruck.plate || 'N/A'}
+          driverName={selectedTruck.driver?.name || 'Unassigned'}
+          booking={{
+            source_city: booking.source_city,
+            destination_city: booking.destination_city,
+            vehicle_type: booking.vehicle_type,
+            material: booking.material,
+            weight_mt: booking.weight_mt,
+            pickup_date: booking.pickup_date,
+            estimated_distance: booking.estimated_distance,
+          }}
+          onConfirm={handleConfirmApproval}
+          onCancel={() => setShowConfirmation(false)}
+        />
+      )}
+    </>
   );
 
   if (!mounted || !container) return null;

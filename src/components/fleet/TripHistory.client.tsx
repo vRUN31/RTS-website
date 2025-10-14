@@ -1,10 +1,29 @@
 "use client";
 import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import type { Trip } from '@/src/types/fleet';
 
-export default function TripHistoryClient() {
-  const [trips, setTrips] = useState<Trip[]>([]);
+type Shipment = {
+  id: string;
+  origin: string;
+  destination: string;
+  status: string;
+  created_at: string;
+  eta?: string | null;
+  delivered_at?: string | null;
+  distance_km?: number | null;
+  cost?: number | null;
+  weight_mt?: number | null;
+  truck_id?: string | null;
+  client_id?: string | null;
+  contract_id?: string | null;
+};
+
+type TripHistoryProps = {
+  truckId?: string | null;
+};
+
+export default function TripHistoryClient({ truckId }: TripHistoryProps = {}) {
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -12,57 +31,36 @@ export default function TripHistoryClient() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all'); // all, today, week, month
-  
-  // New Trip Form
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [trucks, setTrucks] = useState<any[]>([]);
-  const [drivers, setDrivers] = useState<any[]>([]);
-  
-  const [newTrip, setNewTrip] = useState({
-    truck_id: '',
-    driver_id: '',
-    origin: '',
-    destination: '',
-    start_time: '',
-    planned_distance_km: '',
-    planned_duration_hours: '',
-    status: 'scheduled'
-  });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadShipments();
+  }, [truckId]);
 
-  async function loadData() {
+  async function loadShipments() {
     const supabase = createClient();
     setLoading(true);
     
     try {
-      // Load trips
-      const { data: tripsData, error: tripsError } = await supabase
-        .from('trips')
-        .select('*')
-        .order('start_time', { ascending: false })
-        .limit(100);
+      // Build query based on whether we have a specific truck
+      let query = supabase
+        .from('shipments')
+        .select('id, origin, destination, status, created_at, eta, delivered_at, distance_km, cost, weight_mt, truck_id, client_id, contract_id')
+        .order('created_at', { ascending: false });
 
-      if (tripsError) throw tripsError;
+      // Filter by truck if provided
+      if (truckId) {
+        query = query.eq('truck_id', truckId);
+      }
 
-      // Load trucks for dropdown
-      const { data: trucksData } = await supabase
-        .from('trucks')
-        .select('id, display_code, plate')
-        .order('display_code');
+      query = query.limit(100);
 
-      // Load drivers for dropdown
-      const { data: driversData } = await supabase
-        .from('drivers')
-        .select('id, name, phone')
-        .order('name');
+      const { data: shipmentsData, error: shipmentsError } = await query;
 
-      setTrips((tripsData as Trip[]) || []);
-      setTrucks(trucksData || []);
-      setDrivers(driversData || []);
+      if (shipmentsError) throw shipmentsError;
+
+      setShipments((shipmentsData as Shipment[]) || []);
     } catch (e: any) {
+      console.error('Error loading trip history:', e);
       setError(e.message);
     } finally {
       setLoading(false);
@@ -71,76 +69,55 @@ export default function TripHistoryClient() {
 
   async function handleAddTrip(e: React.FormEvent) {
     e.preventDefault();
-    
-    const supabase = createClient();
-    const { error } = await supabase.from('trips').insert({
-      truck_id: newTrip.truck_id || null,
-      driver_id: newTrip.driver_id || null,
-      origin: newTrip.origin,
-      destination: newTrip.destination,
-      start_time: newTrip.start_time,
-      planned_distance_km: newTrip.planned_distance_km ? parseFloat(newTrip.planned_distance_km) : null,
-      planned_duration_hours: newTrip.planned_duration_hours ? parseFloat(newTrip.planned_duration_hours) : null,
-      status: newTrip.status,
-    });
-
-    if (error) {
-      alert('Error creating trip: ' + error.message);
-      return;
-    }
-
-    setShowAddForm(false);
-    setNewTrip({
-      truck_id: '',
-      driver_id: '',
-      origin: '',
-      destination: '',
-      start_time: '',
-      planned_distance_km: '',
-      planned_duration_hours: '',
-      status: 'scheduled'
-    });
-    loadData();
+    // This function is kept for potential future use but not currently active
+    // Trips are created automatically when bookings are approved
   }
 
   // Statistics
   const stats = useMemo(() => {
+    // Map shipment statuses to trip-like statuses
+    const pending = shipments.filter(s => s.status === 'pending').length;
+    const inTransit = shipments.filter(s => s.status === 'in_transit').length;
+    const delivered = shipments.filter(s => s.status === 'delivered').length;
+    const cancelled = shipments.filter(s => s.status === 'cancelled').length;
+    
     return {
-      total: trips.length,
-      scheduled: trips.filter(t => t.status === 'scheduled').length,
-      in_progress: trips.filter(t => t.status === 'in_progress').length,
-      completed: trips.filter(t => t.status === 'completed').length,
-      cancelled: trips.filter(t => t.status === 'cancelled').length,
-      total_distance: trips.reduce((sum, t) => sum + (t.actual_distance_km || 0), 0),
-      avg_distance: trips.length > 0 
-        ? trips.reduce((sum, t) => sum + (t.actual_distance_km || 0), 0) / trips.length 
+      total: shipments.length,
+      pending,
+      in_transit: inTransit,
+      delivered,
+      cancelled,
+      total_distance: shipments.reduce((sum, s) => sum + (s.distance_km || 0), 0),
+      avg_distance: shipments.length > 0 
+        ? shipments.reduce((sum, s) => sum + (s.distance_km || 0), 0) / shipments.length 
         : 0,
+      total_revenue: shipments.reduce((sum, s) => sum + (s.cost || 0), 0),
     };
-  }, [trips]);
+  }, [shipments]);
 
-  // Filtered trips
-  const filteredTrips = useMemo(() => {
-    let filtered = trips.filter(trip => {
+  // Filtered shipments/trips
+  const filteredShipments = useMemo(() => {
+    let filtered = shipments.filter(shipment => {
       const matchesSearch = 
-        trip.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trip.destination.toLowerCase().includes(searchQuery.toLowerCase());
+        shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        shipment.destination.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || shipment.status === statusFilter;
       
       // Date filter
       let matchesDate = true;
       if (dateFilter !== 'all') {
-        const tripDate = new Date(trip.start_time);
+        const shipmentDate = new Date(shipment.created_at);
         const now = new Date();
         
         if (dateFilter === 'today') {
-          matchesDate = tripDate.toDateString() === now.toDateString();
+          matchesDate = shipmentDate.toDateString() === now.toDateString();
         } else if (dateFilter === 'week') {
           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          matchesDate = tripDate >= weekAgo;
+          matchesDate = shipmentDate >= weekAgo;
         } else if (dateFilter === 'month') {
           const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-          matchesDate = tripDate >= monthAgo;
+          matchesDate = shipmentDate >= monthAgo;
         }
       }
       
@@ -148,13 +125,21 @@ export default function TripHistoryClient() {
     });
 
     return filtered;
-  }, [trips, searchQuery, statusFilter, dateFilter]);
+  }, [shipments, searchQuery, statusFilter, dateFilter]);
 
   if (loading) return <div className="loading-spinner">Loading trips...</div>;
   if (error) return <div className="error-message">Error: {error}</div>;
 
   return (
     <div className="trip-history-container">
+      {/* Header with truck filter info */}
+      {truckId && (
+        <div className="filter-info-banner">
+          <span className="info-icon">🚛</span>
+          <span>Showing trip history for selected truck</span>
+        </div>
+      )}
+
       {/* Statistics */}
       <div className="stats-grid">
         <div className="stat-card stat-card-primary">
@@ -164,25 +149,25 @@ export default function TripHistoryClient() {
             <div className="stat-label">Total Trips</div>
           </div>
         </div>
-        <div className="stat-card stat-card-scheduled">
-          <div className="stat-icon">📅</div>
+        <div className="stat-card stat-card-pending">
+          <div className="stat-icon">⏳</div>
           <div className="stat-content">
-            <div className="stat-value">{stats.scheduled}</div>
-            <div className="stat-label">Scheduled</div>
+            <div className="stat-value">{stats.pending}</div>
+            <div className="stat-label">Pending</div>
           </div>
         </div>
         <div className="stat-card stat-card-progress">
           <div className="stat-icon">🚚</div>
           <div className="stat-content">
-            <div className="stat-value">{stats.in_progress}</div>
-            <div className="stat-label">In Progress</div>
+            <div className="stat-value">{stats.in_transit}</div>
+            <div className="stat-label">In Transit</div>
           </div>
         </div>
         <div className="stat-card stat-card-completed">
           <div className="stat-icon">✓</div>
           <div className="stat-content">
-            <div className="stat-value">{stats.completed}</div>
-            <div className="stat-label">Completed</div>
+            <div className="stat-value">{stats.delivered}</div>
+            <div className="stat-label">Delivered</div>
           </div>
         </div>
         <div className="stat-card stat-card-distance">
@@ -192,21 +177,21 @@ export default function TripHistoryClient() {
             <div className="stat-label">Total KM</div>
           </div>
         </div>
-        <div className="stat-card stat-card-avg">
-          <div className="stat-icon">📈</div>
+        <div className="stat-card stat-card-revenue">
+          <div className="stat-icon">�</div>
           <div className="stat-content">
-            <div className="stat-value">{stats.avg_distance.toFixed(1)}</div>
-            <div className="stat-label">Avg KM/Trip</div>
+            <div className="stat-value">₹{(stats.total_revenue / 1000).toFixed(1)}K</div>
+            <div className="stat-label">Revenue</div>
           </div>
         </div>
       </div>
 
       {/* Controls */}
       <div className="controls-bar">
-        <button className="btn-add" onClick={() => setShowAddForm(!showAddForm)}>
-          <span className="btn-icon">➕</span>
-          <span className="btn-text">{showAddForm ? 'Close' : 'New Trip'}</span>
-        </button>
+        <div className="info-text">
+          <span className="info-icon">ℹ️</span>
+          <span>Trip records are automatically created when bookings are approved</span>
+        </div>
 
         <div className="filters-group">
           <input
@@ -223,9 +208,9 @@ export default function TripHistoryClient() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="all">All Status</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="in_transit">In Transit</option>
+            <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
           </select>
 
@@ -242,141 +227,64 @@ export default function TripHistoryClient() {
         </div>
       </div>
 
-      {/* Add Trip Form */}
-      {showAddForm && (
-        <div className="add-form-panel">
-          <h3>Schedule New Trip</h3>
-          <form className="trip-form" onSubmit={handleAddTrip}>
-            <select
-              className="form-select"
-              value={newTrip.truck_id}
-              onChange={(e) => setNewTrip({...newTrip, truck_id: e.target.value})}
-              required
-            >
-              <option value="">Select Truck</option>
-              {trucks.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.display_code} - {t.plate}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="form-select"
-              value={newTrip.driver_id}
-              onChange={(e) => setNewTrip({...newTrip, driver_id: e.target.value})}
-            >
-              <option value="">Select Driver (Optional)</option>
-              {drivers.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-
-            <input
-              className="form-input"
-              type="text"
-              placeholder="Origin"
-              value={newTrip.origin}
-              onChange={(e) => setNewTrip({...newTrip, origin: e.target.value})}
-              required
-            />
-
-            <input
-              className="form-input"
-              type="text"
-              placeholder="Destination"
-              value={newTrip.destination}
-              onChange={(e) => setNewTrip({...newTrip, destination: e.target.value})}
-              required
-            />
-
-            <input
-              className="form-input"
-              type="datetime-local"
-              value={newTrip.start_time}
-              onChange={(e) => setNewTrip({...newTrip, start_time: e.target.value})}
-              required
-            />
-
-            <input
-              className="form-input"
-              type="number"
-              step="0.1"
-              placeholder="Distance (km)"
-              value={newTrip.planned_distance_km}
-              onChange={(e) => setNewTrip({...newTrip, planned_distance_km: e.target.value})}
-            />
-
-            <input
-              className="form-input"
-              type="number"
-              step="0.1"
-              placeholder="Duration (hours)"
-              value={newTrip.planned_duration_hours}
-              onChange={(e) => setNewTrip({...newTrip, planned_duration_hours: e.target.value})}
-            />
-
-            <button type="submit" className="btn-submit">
-              <span className="btn-icon">✓</span>
-              <span className="btn-text">Create Trip</span>
-            </button>
-          </form>
-        </div>
-      )}
-
       {/* Results */}
       <div className="results-info">
         <h3>Trip Records</h3>
-        <span>Showing {filteredTrips.length} of {trips.length} trips</span>
+        <span>Showing {filteredShipments.length} of {shipments.length} trips</span>
       </div>
 
       {/* Trips Table */}
-      {filteredTrips.length === 0 ? (
+      {filteredShipments.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">🚛</div>
           <h3>No trips found</h3>
-          <p>Try adjusting your filters or create a new trip</p>
+          <p>
+            {truckId 
+              ? 'This truck has no trip history yet. Trips are created when admin approves bookings and assigns this truck.'
+              : 'Try adjusting your filters or wait for bookings to be approved'
+            }
+          </p>
         </div>
       ) : (
         <div className="table-container">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Date</th>
+                <th>Created</th>
                 <th>Route</th>
-                <th>Truck</th>
                 <th>Status</th>
+                <th>Weight</th>
                 <th>Distance</th>
-                <th>Duration</th>
+                <th>ETA</th>
+                <th>Delivered</th>
                 <th>Cost</th>
               </tr>
             </thead>
             <tbody>
-              {filteredTrips.map((trip, index) => (
-                <tr key={trip.id} className="data-row" style={{ animationDelay: `${index * 0.05}s` }}>
-                  <td>{new Date(trip.start_time).toLocaleDateString()}</td>
+              {filteredShipments.map((shipment, index) => (
+                <tr key={shipment.id} className="data-row" style={{ animationDelay: `${index * 0.05}s` }}>
+                  <td>{new Date(shipment.created_at).toLocaleDateString()}</td>
                   <td>
                     <div className="route-cell">
-                      <div className="route-origin">{trip.origin}</div>
+                      <div className="route-origin">{shipment.origin}</div>
                       <div className="route-arrow">→</div>
-                      <div className="route-destination">{trip.destination}</div>
+                      <div className="route-destination">{shipment.destination}</div>
                     </div>
                   </td>
-                  <td>{trip.truck_id || '—'}</td>
                   <td>
-                    <span className={`status-badge status-${trip.status}`}>
-                      {trip.status === 'scheduled' && '📅 '}
-                      {trip.status === 'in_progress' && '🚚 '}
-                      {trip.status === 'completed' && '✓ '}
-                      {trip.status === 'cancelled' && '✖ '}
-                      {trip.status.replace('_', ' ')}
+                    <span className={`status-badge status-${shipment.status}`}>
+                      {shipment.status === 'pending' && '⏳ '}
+                      {shipment.status === 'in_transit' && '🚚 '}
+                      {shipment.status === 'delivered' && '✓ '}
+                      {shipment.status === 'cancelled' && '✖ '}
+                      {shipment.status.replace('_', ' ')}
                     </span>
                   </td>
-                  <td>{trip.actual_distance_km || trip.planned_distance_km || '—'} km</td>
-                  <td>{trip.actual_duration_hours || trip.planned_duration_hours || '—'} hrs</td>
-                  <td>{trip.total_cost ? `₹${trip.total_cost.toFixed(2)}` : '—'}</td>
+                  <td>{shipment.weight_mt ? `${shipment.weight_mt}T` : '—'}</td>
+                  <td>{shipment.distance_km ? `${shipment.distance_km} km` : '—'}</td>
+                  <td>{shipment.eta ? new Date(shipment.eta).toLocaleDateString() : '—'}</td>
+                  <td>{shipment.delivered_at ? new Date(shipment.delivered_at).toLocaleDateString() : '—'}</td>
+                  <td>{shipment.cost ? `₹${shipment.cost.toFixed(2)}` : '—'}</td>
                 </tr>
               ))}
             </tbody>

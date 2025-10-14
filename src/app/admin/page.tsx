@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation';
 import { createClient as createServerSupabase } from '@/utils/supabase/server';
 
 import LeafletMap from '@/src/components/map/LeafletMap.client';
-import AdminAnalytics from '@/src/components/admin/AdminAnalytics.client';
 import BookingActionRow from '@/src/components/admin/BookingActionRow.client';
 import OpenAssignTruckModalListener from '@/src/components/admin/OpenAssignTruckModalListener.client';
 import AdminShell from './_admin-shell.client';

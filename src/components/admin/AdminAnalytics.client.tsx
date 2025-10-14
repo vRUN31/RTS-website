@@ -12,6 +12,7 @@ export default function AdminAnalytics() {
     revenuePerMonth: useRef<HTMLCanvasElement | null>(null),
     trucksByStatus: useRef<HTMLCanvasElement | null>(null),
     profitLoss: useRef<HTMLCanvasElement | null>(null),
+    truckProfitLoss: useRef<HTMLCanvasElement | null>(null),
   };
 
   function draw() {
@@ -124,6 +125,58 @@ export default function AdminAnalytics() {
       });
     }
 
+    // Truck Profit/Loss (Bar - Horizontal)
+    if (data.truckProfitLoss && data.truckProfitLoss.length > 0) {
+      const sortedTrucks = [...data.truckProfitLoss].sort((a, b) => b.profit_loss - a.profit_loss);
+      const truckLabels = sortedTrucks.map(t => t.truck_code || t.plate);
+      const truckProfitValues = sortedTrucks.map(t => t.profit_loss);
+      
+      makeChart(refs.truckProfitLoss.current, {
+        type: 'bar',
+        data: {
+          labels: truckLabels,
+          datasets: [{
+            label: 'Profit/Loss per Truck',
+            data: truckProfitValues,
+            backgroundColor: truckProfitValues.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value: any) {
+                  return '₹' + value.toLocaleString();
+                }
+              }
+            },
+            y: {}
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context: any) {
+                  const truck = sortedTrucks[context.dataIndex];
+                  return [
+                    `Profit/Loss: ₹${context.parsed.x.toLocaleString()}`,
+                    `Revenue: ₹${truck.total_revenue.toLocaleString()}`,
+                    `Cost: ₹${truck.total_cost.toLocaleString()}`,
+                    `Shipments: ${truck.shipment_count}`
+                  ];
+                }
+              }
+            }
+          }
+        },
+      });
+    }
+
     return () => { teardown.forEach((t) => t()); };
   }
 
@@ -175,6 +228,52 @@ export default function AdminAnalytics() {
         <div className="panel">
           <div className="panel-title">Profit / Loss</div>
           <canvas ref={refs.profitLoss} height={160} />
+        </div>
+      </section>
+
+      {/* Performance Summary Cards */}
+      {data?.performanceSummary && (
+        <section className="grid-4 mt-16">
+          <div className="stat-card stat-card-primary">
+            <div className="stat-icon">🚚</div>
+            <div className="stat-content">
+              <div className="stat-value">{data.performanceSummary.total_trucks}</div>
+              <div className="stat-label">Total Trucks</div>
+            </div>
+          </div>
+          <div className="stat-card stat-card-success">
+            <div className="stat-icon">✅</div>
+            <div className="stat-content">
+              <div className="stat-value">{data.performanceSummary.profitable_trucks}</div>
+              <div className="stat-label">Profitable</div>
+            </div>
+          </div>
+          <div className="stat-card stat-card-danger">
+            <div className="stat-icon">⚠️</div>
+            <div className="stat-content">
+              <div className="stat-value">{data.performanceSummary.loss_making_trucks}</div>
+              <div className="stat-label">Loss Making</div>
+            </div>
+          </div>
+          <div className="stat-card stat-card-info">
+            <div className="stat-icon">💰</div>
+            <div className="stat-content">
+              <div className="stat-value">
+                ₹{(data.performanceSummary.net_profit_loss / 1000).toFixed(1)}K
+              </div>
+              <div className="stat-label">Net Profit/Loss</div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Truck Profit/Loss Chart */}
+      <section className="grid-1 mt-16">
+        <div className="panel">
+          <div className="panel-title">Profit/Loss Per Truck</div>
+          <div style={{ height: '400px' }}>
+            <canvas ref={refs.truckProfitLoss} />
+          </div>
         </div>
       </section>
 

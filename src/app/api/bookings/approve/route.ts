@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/src/utils/supabase/server';
+import { sendDriverAssignmentEmail } from '@/src/utils/email';
 
 export async function GET() {
 	return NextResponse.json({ 
@@ -121,7 +122,13 @@ export async function POST(req: Request) {
 		}
 
 		// Basic validation: truck should exist and not be offline/maintenance
-		const { data: truck, error: tErr } = await supabase.from('trucks').select('id, status').eq('id', truckId).maybeSingle();
+		// Also fetch truck details including driver information for email
+		const { data: truck, error: tErr } = await supabase
+			.from('trucks')
+			.select('id, status, plate, driver_id')
+			.eq('id', truckId)
+			.maybeSingle();
+			
 		if (tErr) {
 			console.error('[approve api] truck lookup failed', { err: tErr.message, truckId });
 			return NextResponse.json({ 
@@ -144,6 +151,28 @@ export async function POST(req: Request) {
 				error: 'Truck not available',
 				truckStatus: truck.status
 			}, { status: 400, headers });
+		}
+
+		// Fetch driver details for email notification
+		let driverEmail: string | null = null;
+		let driverName = 'Driver';
+		
+		if (truck.driver_id) {
+			const { data: driver, error: driverErr } = await supabase
+				.from('drivers')
+				.select('email, name')
+				.eq('id', truck.driver_id)
+				.maybeSingle();
+				
+			if (!driverErr && driver) {
+				driverEmail = driver.email;
+				driverName = driver.name || 'Driver';
+				console.log('[approve api] Driver found:', { name: driverName, email: driverEmail ? '✓' : '✗' });
+			} else {
+				console.warn('[approve api] Could not fetch driver details:', driverErr?.message);
+			}
+		} else {
+			console.warn('[approve api] Truck has no driver assigned');
 		}
 
 		// Example placeholder cost and ETA
@@ -195,6 +224,54 @@ export async function POST(req: Request) {
 		} catch (e) { 
 			console.error('notify error', e); 
 			// Don't fail the main operation for notification errors
+		}
+
+		// Send email notification to driver
+		if (driverEmail) {
+			console.log('[approve api] Sending email notification to driver...');
+			try {
+				// Calculate estimated time based on distance
+				const distance = booking.estimated_distance || 500;
+				const avgSpeed = 50; // km/h average
+				const totalHours = distance / avgSpeed;
+				const days = Math.floor(totalHours / 24);
+				const hours = Math.floor(totalHours % 24);
+				const estimatedTime = days > 0 
+					? `${days} day${days > 1 ? 's' : ''} ${hours}h`
+					: `${hours}h ${Math.round((totalHours % 1) * 60)}m`;
+
+				const emailResult = await sendDriverAssignmentEmail(driverEmail, {
+					driverName,
+					truckPlate: truck.plate || truckId.slice(0, 8).toUpperCase(),
+					bookingId,
+					sourceCity: booking.source_city,
+					destinationCity: booking.destination_city,
+					distance,
+					estimatedTime,
+					pickupDate: booking.pickup_date 
+						? new Date(booking.pickup_date).toLocaleDateString('en-IN', { 
+							day: 'numeric', 
+							month: 'short', 
+							year: 'numeric' 
+						})
+						: 'TBD',
+					material: booking.material || undefined,
+					weight: booking.weight_mt || undefined,
+					vehicleType: booking.vehicle_type || 'Standard Truck',
+					specialInstructions: undefined, // Can be added if needed
+				});
+
+				if (emailResult.success) {
+					console.log('✅ [approve api] Email sent successfully to driver:', driverEmail);
+				} else {
+					console.warn('⚠️ [approve api] Email send failed:', emailResult.error);
+				}
+			} catch (emailError: any) {
+				console.error('❌ [approve api] Email error:', emailError.message);
+				// Don't fail the main operation for email errors
+			}
+		} else {
+			console.warn('⚠️ [approve api] No driver email available, skipping email notification');
 		}
 
 		console.log('[API approve] Success - booking approved');

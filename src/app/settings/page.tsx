@@ -1,39 +1,57 @@
-"use client";
-import React, { useEffect, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
-import ThemeToggle from '@/src/components/ThemeToggle.client';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { createClient as createServerSupabase } from '@/utils/supabase/server';
+import SettingsContent from './_settings-content.client';
 
-export default function SettingsPage() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export default async function SettingsPage() {
+  // SSR guard: authenticated users only
+  const cookieStore = await cookies();
+  const supabase = createServerSupabase(cookieStore as any);
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) redirect('/login');
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-      setLoading(false);
-    });
-  }, []);
+  // Get user profile to determine role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, name, email')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const isAdmin = profile?.role === 'admin';
+
+  // Fetch user settings
+  const { data: userSettings } = await supabase
+    .from('user_settings')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  // Fetch notification preferences
+  const { data: notificationPrefs } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  // Fetch system config if admin
+  let systemConfig = null;
+  if (isAdmin) {
+    const { data } = await supabase
+      .from('system_config')
+      .select('*')
+      .in('config_type', ['pricing', 'operational']);
+    systemConfig = data;
+  }
 
   return (
-    <>
-      <ThemeToggle />
-      <div className="dashboard-container card">
-        <h1 className="dashboard-header">Settings</h1>
-        {loading && <p className="text-center">Loading...</p>}
-        {!loading && !user && (
-          <p className="text-center">Please <a className="link-primary" href="/login">login</a> to access settings.</p>
-        )}
-        {!loading && user && (
-          <div className="col-gap-32 mt-18">
-            <div className="panel">
-              <div className="panel-title">Account</div>
-              <p className="text-dim">Email: <strong>{user.email}</strong></p>
-              <p className="text-muted">More settings coming soon (profile, notifications, preferences).</p>
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+    <SettingsContent 
+      user={user}
+      profile={profile}
+      isAdmin={isAdmin}
+      initialSettings={userSettings}
+      initialNotificationPrefs={notificationPrefs}
+      initialSystemConfig={systemConfig}
+    />
   );
 }
