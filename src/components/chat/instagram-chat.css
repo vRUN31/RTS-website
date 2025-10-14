@@ -149,9 +149,11 @@
 .chat-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px;
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
     gap: 12px;
     background: #f8fafc;
     scroll-behavior: smooth;
@@ -159,6 +161,8 @@
 
 [data-theme="dark"] .chat-messages {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* Custom Scrollbar */

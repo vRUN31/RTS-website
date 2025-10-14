@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                          <div className="footer-contact">
                              <strong>Contact Us</strong>
                              <div className="muted-small">Phone: <a href="tel:+911234567890">+91 12345 67890</a></div>
-                             <div className="muted-small">Email: <a href="mailto:info@rajmohan.com">info@rajmohan.com</a></div>
+                             <div className="muted-small">Email: <a href="mailto:rajmohantransportservice@gmail.com">rajmohantransportservice@gmail.com</a></div>
                              <div className="muted-small">Address: Shree Ganesh Plaza, Park Sight Society, Sector - 2, Greater Khanda, Panvel, Navi Mumbai, Maharashtra, India</div>
                          </div>
                          <div className="footer-copyright">&copy; RTS. All rights reserved.</div>
