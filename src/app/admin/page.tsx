@@ -6,6 +6,7 @@ import { createClient as createServerSupabase } from '@/utils/supabase/server';
 import LeafletMap from '@/src/components/map/LeafletMap.client';
 import BookingActionRow from '@/src/components/admin/BookingActionRow.client';
 import OpenAssignTruckModalListener from '@/src/components/admin/OpenAssignTruckModalListener.client';
+import RecentShipmentsTable from '@/src/components/admin/RecentShipmentsTable.client';
 import AdminShell from './_admin-shell.client';
 import AdminDashboardLinks from './_dashboard-links.client';
 
@@ -53,7 +54,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     // Recent shipments
     const { data: recentShipments } = await supabase
         .from('shipments')
-        .select('id, origin, destination, status, created_at')
+        .select('id, origin, destination, status, created_at, client_id')
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .order('created_at', { ascending: false })
@@ -286,30 +287,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
             <section className="panel mt-16">
                 <div className="panel-title">Recent Shipments</div>
-                <div className="table-responsive">
-                <table className="table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Origin</th>
-                            <th>Destination</th>
-                            <th>Status</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(recentShipments ?? []).map((s) => (
-                            <tr key={s.id}>
-                                <td className="cell-id">{String(s.id).slice(0,8)}…</td>
-                                <td>{s.origin ?? '—'}</td>
-                                <td>{s.destination ?? '—'}</td>
-                                <td>{s.status ?? '—'}</td>
-                                <td>{s.created_at?.slice(0,10) ?? '—'}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                </div>
+                <RecentShipmentsTable initialShipments={recentShipments ?? []} />
             </section>
 
             {/* Manage Book Truck Requests */}

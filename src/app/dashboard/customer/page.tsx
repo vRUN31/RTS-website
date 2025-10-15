@@ -226,6 +226,7 @@ export default function CustomerDashboardPage() {
         
         // Subscribe to real-time notifications
         if (userId && supabaseUrl && supabaseAnonKey) {
+            console.log('🔔 Setting up real-time notifications subscription for user:', userId);
             const channel = supabase
                 .channel('notifications_realtime')
                 .on(
@@ -237,13 +238,20 @@ export default function CustomerDashboardPage() {
                         filter: `user_id=eq.${userId}`,
                     },
                     (payload) => {
-                        console.log('New notification received:', payload);
+                        console.log('✅ New notification received:', payload);
                         if (mounted && payload.new) {
                             setNotifications((prev) => [payload.new as Notification, ...prev.slice(0, 9)]);
+                            // Show a brief alert or toast (optional)
+                            console.log('📬 Notification added to list');
                         }
                     }
                 )
-                .subscribe();
+                .subscribe((status, err) => {
+                    console.log('📡 Subscription status:', status);
+                    if (err) {
+                        console.error('❌ Subscription error:', err);
+                    }
+                });
                 
             return () => {
                 mounted = false;
@@ -648,22 +656,17 @@ export default function CustomerDashboardPage() {
                                         })();
                                         
                                         return (
-                                            <li key={n.id} style={{ 
-                                                padding: '14px 16px', 
-                                                background: '#f8fafc', 
-                                                marginBottom: '8px', 
-                                                borderRadius: '8px',
-                                                borderLeft: `3px solid ${notifType.includes('reject') ? '#ef4444' : 'var(--brand)'}`,
-                                                fontSize: '0.938rem',
-                                                display: 'flex',
-                                                alignItems: 'flex-start',
-                                                gap: '10px',
-                                                transition: 'all 0.2s ease'
-                                            }}>
-                                                <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>{icon}</span>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 500, marginBottom: '4px' }}>{n.payload.message}</div>
-                                                    <div style={{ fontSize: '0.813rem', color: '#64748b' }}>{timeAgo}</div>
+                                            <li 
+                                                key={n.id} 
+                                                className={styles.notificationItem}
+                                                style={{ 
+                                                    borderLeft: `3px solid ${notifType.includes('reject') ? '#ef4444' : 'var(--brand)'}`
+                                                }}
+                                            >
+                                                <span className={styles.notificationIcon}>{icon}</span>
+                                                <div className={styles.notificationContent}>
+                                                    <div className={styles.notificationMessage}>{n.payload.message}</div>
+                                                    <div className={styles.notificationTime}>{timeAgo}</div>
                                                 </div>
                                             </li>
                                         );
@@ -724,7 +727,6 @@ export default function CustomerDashboardPage() {
                                         >
                                             ⚠️ Report Issue
                                         </button>
-                                        <a className={`btn-dark ${styles.enhancedButton}`} href="#">🎫 Create Ticket</a>
                                     </div>
                                 </div>
                             ) : (

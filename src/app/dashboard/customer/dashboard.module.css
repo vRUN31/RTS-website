@@ -866,4 +866,60 @@
     animation: pulse 2s ease-in-out infinite;
 }
 
+/* Notification Item Styles */
+.notificationItem {
+    padding: 14px 16px;
+    background: #f8fafc;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    font-size: 0.938rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    transition: all 0.2s ease;
+}
+
+.notificationItem:hover {
+    transform: translateX(2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .notificationItem {
+    background: #1e293b;
+}
+
+[data-theme="dark"] .notificationItem:hover {
+    background: #334155;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.notificationIcon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.notificationContent {
+    flex: 1;
+}
+
+.notificationMessage {
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: #1e293b;
+}
+
+[data-theme="dark"] .notificationMessage {
+    color: #e2e8f0;
+}
+
+.notificationTime {
+    font-size: 0.813rem;
+    color: #64748b;
+}
+
+[data-theme="dark"] .notificationTime {
+    color: #94a3b8;
+}
+
 /* Dark mode inline element overrides moved to globals.css to avoid CSS Modules purity issues */
+
