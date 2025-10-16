@@ -57,8 +57,11 @@ export default function CustomerDashboardPage() {
     const [placeSuccess, setPlaceSuccess] = useState<string | null>(null);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [notificationsLoading, setNotificationsLoading] = useState(false);
+    const [showAllNotifications, setShowAllNotifications] = useState(false);
     const [showChat, setShowChat] = useState(false);
     const [showIssueForm, setShowIssueForm] = useState(false);
+    const [showDocuments, setShowDocuments] = useState(false);
+    const [selectedShipmentForDocs, setSelectedShipmentForDocs] = useState<string | null>(null);
     const [form, setForm] = useState({
         source_city: '',
         destination_city: '',
@@ -105,6 +108,8 @@ export default function CustomerDashboardPage() {
 
     useEffect(() => {
         let mounted = true;
+        const supabase = createClient();
+        
         async function load() {
             setError(null);
             setLoading(true);
@@ -112,7 +117,6 @@ export default function CustomerDashboardPage() {
                 if (!supabaseUrl || !supabaseAnonKey) {
                     if (mounted) setRows([]);
                 } else {
-                    const supabase = createClient();
                     const { data: { user } } = await supabase.auth.getUser();
                     let clientId: string | undefined;
                     if (user?.id) {
@@ -133,6 +137,70 @@ export default function CustomerDashboardPage() {
                     const { data, error } = clientId ? await query.eq('client_id', clientId) : await query;
                     if (error) throw error;
                     if (mounted) setRows(data as Shipment[]);
+                    
+                    // Set up real-time subscription for shipments updates
+                    if (clientId) {
+                        console.log('🚚 Setting up real-time shipments subscription for client:', clientId);
+                        const channel = supabase
+                            .channel('shipments_realtime')
+                            .on(
+                                'postgres_changes',
+                                {
+                                    event: 'UPDATE',
+                                    schema: 'public',
+                                    table: 'shipments',
+                                    filter: `client_id=eq.${clientId}`,
+                                },
+                                (payload) => {
+                                    console.log('✅ Shipment updated:', payload);
+                                    if (mounted && payload.new) {
+                                        setRows((prev) => {
+                                            const updated = payload.new as Shipment;
+                                            const index = prev.findIndex(s => s.id === updated.id);
+                                            if (index >= 0) {
+                                                // Update existing shipment
+                                                const newRows = [...prev];
+                                                newRows[index] = updated;
+                                                console.log('📦 Shipment updated in list:', updated.id, 'Status:', updated.status);
+                                                return newRows;
+                                            } else {
+                                                // Add new shipment if not found
+                                                console.log('📦 New shipment added to list:', updated.id);
+                                                return [updated, ...prev];
+                                            }
+                                        });
+                                    }
+                                }
+                            )
+                            .on(
+                                'postgres_changes',
+                                {
+                                    event: 'INSERT',
+                                    schema: 'public',
+                                    table: 'shipments',
+                                    filter: `client_id=eq.${clientId}`,
+                                },
+                                (payload) => {
+                                    console.log('✅ New shipment inserted:', payload);
+                                    if (mounted && payload.new) {
+                                        const newShipment = payload.new as Shipment;
+                                        setRows((prev) => [newShipment, ...prev]);
+                                        console.log('📦 New shipment added to list:', newShipment.id);
+                                    }
+                                }
+                            )
+                            .subscribe((status, err) => {
+                                console.log('📡 Shipments subscription status:', status);
+                                if (err) {
+                                    console.error('❌ Shipments subscription error:', err);
+                                }
+                            });
+                        
+                        return () => {
+                            mounted = false;
+                            supabase.removeChannel(channel);
+                        };
+                    }
                 }
             } catch (e: any) {
                 if (mounted) setError(e?.message ?? 'Failed to load shipments');
@@ -638,50 +706,167 @@ export default function CustomerDashboardPage() {
                                 </div>
                             )}
                             {!notificationsLoading && notifications.length > 0 && (
-                                <ul style={{ listStyle: 'none', padding: 0, width: '100%' }}>
-                                    {notifications.map((n) => {
-                                        const notifType = n.type || 'system';
-                                        const icon = notifType === 'dispatch' ? '🚚' : 
-                                                     notifType === 'system' ? '🔔' : 
-                                                     notifType.includes('reject') ? '❌' : '📬';
-                                        const timeAgo = (() => {
-                                            const diff = Date.now() - new Date(n.created_at).getTime();
-                                            const mins = Math.floor(diff / 60000);
-                                            const hours = Math.floor(diff / 3600000);
-                                            const days = Math.floor(diff / 86400000);
-                                            if (days > 0) return `${days}d ago`;
-                                            if (hours > 0) return `${hours}h ago`;
-                                            if (mins > 0) return `${mins}m ago`;
-                                            return 'Just now';
-                                        })();
-                                        
-                                        return (
-                                            <li 
-                                                key={n.id} 
-                                                className={styles.notificationItem}
-                                                style={{ 
-                                                    borderLeft: `3px solid ${notifType.includes('reject') ? '#ef4444' : 'var(--brand)'}`
+                                <>
+                                    <ul style={{ listStyle: 'none', padding: 0, width: '100%' }}>
+                                        {notifications.slice(0, 3).map((n) => {
+                                            const notifType = n.type || 'system';
+                                            const icon = notifType === 'dispatch' ? '🚚' : 
+                                                         notifType === 'system' ? '🔔' : 
+                                                         notifType.includes('reject') ? '❌' : 
+                                                         notifType.includes('trip_start') ? '�' :
+                                                         notifType.includes('trip_end') ? '🏁' : '�📬';
+                                            const timeAgo = (() => {
+                                                const diff = Date.now() - new Date(n.created_at).getTime();
+                                                const mins = Math.floor(diff / 60000);
+                                                const hours = Math.floor(diff / 3600000);
+                                                const days = Math.floor(diff / 86400000);
+                                                if (days > 0) return `${days}d ago`;
+                                                if (hours > 0) return `${hours}h ago`;
+                                                if (mins > 0) return `${mins}m ago`;
+                                                return 'Just now';
+                                            })();
+                                            
+                                            return (
+                                                <li 
+                                                    key={n.id} 
+                                                    className={styles.notificationItem}
+                                                    style={{ 
+                                                        borderLeft: `3px solid ${notifType.includes('reject') ? '#ef4444' : 'var(--brand)'}`
+                                                    }}
+                                                >
+                                                    <span className={styles.notificationIcon}>{icon}</span>
+                                                    <div className={styles.notificationContent}>
+                                                        <div className={styles.notificationMessage}>{n.payload.message}</div>
+                                                        <div className={styles.notificationTime}>{timeAgo}</div>
+                                                    </div>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                    {notifications.length > 3 && (
+                                        <div style={{ 
+                                            textAlign: 'center', 
+                                            padding: '12px 0 8px 0',
+                                            borderTop: '1px solid #e2e8f0'
+                                        }}>
+                                            <button
+                                                onClick={() => setShowAllNotifications(true)}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--brand)',
+                                                    fontSize: '0.875rem',
+                                                    cursor: 'pointer',
+                                                    textDecoration: 'underline',
+                                                    padding: '4px 8px'
                                                 }}
                                             >
-                                                <span className={styles.notificationIcon}>{icon}</span>
-                                                <div className={styles.notificationContent}>
-                                                    <div className={styles.notificationMessage}>{n.payload.message}</div>
-                                                    <div className={styles.notificationTime}>{timeAgo}</div>
-                                                </div>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
+                                                Show all notifications ({notifications.length})
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                         <div className={`panel ${styles.panelCenter}`} id="documents">
                             <div className="panel-title">📄 Document Center</div>
-                            <ul style={{ listStyle: 'none', padding: 0, width: '100%' }}>
-                                <li style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>📋 Waybill</li>
-                                <li style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>🧾 Invoice</li>
-                                <li style={{ padding: '10px', borderBottom: '1px solid #e2e8f0' }}>✅ PoD</li>
-                                <li style={{ padding: '10px' }}>📊 Compliance</li>
-                            </ul>
+                            <p style={{ 
+                                fontSize: '0.875rem', 
+                                color: 'var(--text-secondary)', 
+                                marginBottom: '16px',
+                                textAlign: 'center' 
+                            }}>
+                                Access shipment documents by selecting a shipment below
+                            </p>
+                            
+                            {loading ? (
+                                <div style={{ padding: '20px', textAlign: 'center' }}>
+                                    <div className={styles.loadingSpinner} style={{ margin: '0 auto' }}></div>
+                                </div>
+                            ) : rows.length === 0 ? (
+                                <div className={styles.emptyState}>
+                                    <p>No shipments found. Documents will appear here once you have active shipments.</p>
+                                </div>
+                            ) : (
+                                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {rows.slice(0, 5).map((shipment) => {
+                                        const isDelivered = shipment.status?.toLowerCase() === 'delivered';
+                                        const docsAvailable = isDelivered ? 4 : 3; // All 4 docs if delivered, else 3
+                                        
+                                        return (
+                                            <button
+                                                key={shipment.id}
+                                                onClick={() => {
+                                                    setSelectedShipmentForDocs(shipment.id);
+                                                    setShowDocuments(true);
+                                                }}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px',
+                                                    background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                                                    border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    textAlign: 'left',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 77, 0, 0.05)';
+                                                    e.currentTarget.style.borderColor = 'var(--brand)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)';
+                                                    e.currentTarget.style.borderColor = isDarkMode ? '#334155' : '#e2e8f0';
+                                                }}
+                                            >
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ 
+                                                        fontSize: '0.813rem', 
+                                                        fontWeight: 600,
+                                                        color: 'var(--text)',
+                                                        marginBottom: '4px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px'
+                                                    }}>
+                                                        {shipment.origin} → {shipment.destination}
+                                                        <span style={{
+                                                            fontSize: '0.688rem',
+                                                            padding: '2px 6px',
+                                                            borderRadius: '4px',
+                                                            background: isDelivered ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                                                            color: isDelivered ? '#10b981' : '#3b82f6',
+                                                            fontWeight: 700
+                                                        }}>
+                                                            {docsAvailable}/4 docs
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ 
+                                                        fontSize: '0.75rem', 
+                                                        color: 'var(--text-secondary)' 
+                                                    }}>
+                                                        ID: {String(shipment.id).slice(0, 8)}... • {shipment.status}
+                                                    </div>
+                                                </div>
+                                                <span style={{ color: 'var(--brand)', fontSize: '1.25rem' }}>→</span>
+                                            </button>
+                                        );
+                                    })}
+                                    {rows.length > 5 && (
+                                        <div style={{ 
+                                            textAlign: 'center', 
+                                            padding: '8px 0',
+                                            fontSize: '0.75rem',
+                                            color: 'var(--text-secondary)'
+                                        }}>
+                                            Showing 5 of {rows.length} shipments
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     <div className={`panel ${styles.panelCenter}`} id="aboutus">
                 <div className="panel-title">ℹ️ About Us</div>
@@ -803,17 +988,30 @@ export default function CustomerDashboardPage() {
                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}>
                                     📖 <span>User Guide</span>
                                 </a>
-                                <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
-                                   onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
-                                   onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}>
-                                    🎥 <span>Video Tutorials</span>
-                                </a>
-                                <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
-                                   onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
-                                   onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}>
+                                <button 
+                                    onClick={() => setShowChat(true)}
+                                    style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '10px', 
+                                        padding: '10px', 
+                                        background: 'rgba(255, 77, 0, 0.05)', 
+                                        borderRadius: '8px', 
+                                        border: 'none',
+                                        color: 'var(--text)', 
+                                        transition: 'all 0.2s',
+                                        cursor: 'pointer',
+                                        width: '100%',
+                                        textAlign: 'left',
+                                        fontSize: 'inherit',
+                                        fontFamily: 'inherit'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}
+                                >
                                     📞 <span>Contact Support</span>
-                                </a>
-                                <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
+                                </button>
+                                <a href="mailto:support@rajmohantransport.com" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}>
                                     📧 <span>Email Us</span>
@@ -844,6 +1042,516 @@ export default function CustomerDashboardPage() {
                         console.log('Issue reported successfully');
                     }}
                 />
+            )}
+            
+            {/* All Notifications Modal */}
+            {showAllNotifications && (
+                <div 
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '20px'
+                    }}
+                    onClick={() => setShowAllNotifications(false)}
+                >
+                    <div 
+                        style={{
+                            background: isDarkMode ? '#1e293b' : 'white',
+                            borderRadius: '12px',
+                            maxWidth: '600px',
+                            width: '100%',
+                            maxHeight: '80vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div style={{
+                            padding: '20px',
+                            borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <h2 style={{ 
+                                margin: 0, 
+                                fontSize: '1.5rem',
+                                color: isDarkMode ? '#f1f5f9' : '#1e293b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                            }}>
+                                🔔 All Notifications
+                                <span style={{
+                                    background: 'var(--brand)',
+                                    color: 'white',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    minWidth: '20px'
+                                }}>
+                                    {notifications.length}
+                                </span>
+                            </h2>
+                            <button
+                                onClick={() => setShowAllNotifications(false)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '1.5rem',
+                                    cursor: 'pointer',
+                                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                                    padding: '4px',
+                                    lineHeight: 1
+                                }}
+                                aria-label="Close"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        {/* Modal Body */}
+                        <div style={{
+                            overflowY: 'auto',
+                            padding: '10px',
+                            flex: 1
+                        }}>
+                            {notificationsLoading && (
+                                <div style={{ padding: '40px', textAlign: 'center' }}>
+                                    <div className={styles.loadingSpinner} style={{ margin: '0 auto' }}></div>
+                                </div>
+                            )}
+                            
+                            {!notificationsLoading && notifications.length === 0 && (
+                                <div className={styles.emptyState} style={{ padding: '40px' }}>
+                                    <p>No notifications yet.</p>
+                                </div>
+                            )}
+                            
+                            {!notificationsLoading && notifications.length > 0 && (
+                                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                    {notifications.map((n) => {
+                                        const notifType = n.type || 'system';
+                                        const icon = notifType === 'dispatch' ? '🚚' : 
+                                                     notifType === 'system' ? '🔔' : 
+                                                     notifType.includes('reject') ? '❌' : 
+                                                     notifType.includes('trip_start') ? '🚀' :
+                                                     notifType.includes('trip_end') ? '🏁' : '📬';
+                                        const timeAgo = (() => {
+                                            const diff = Date.now() - new Date(n.created_at).getTime();
+                                            const mins = Math.floor(diff / 60000);
+                                            const hours = Math.floor(diff / 3600000);
+                                            const days = Math.floor(diff / 86400000);
+                                            if (days > 0) return `${days}d ago`;
+                                            if (hours > 0) return `${hours}h ago`;
+                                            if (mins > 0) return `${mins}m ago`;
+                                            return 'Just now';
+                                        })();
+                                        
+                                        return (
+                                            <li 
+                                                key={n.id} 
+                                                className={styles.notificationItem}
+                                                style={{ 
+                                                    borderLeft: `3px solid ${notifType.includes('reject') ? '#ef4444' : 'var(--brand)'}`
+                                                }}
+                                            >
+                                                <span className={styles.notificationIcon}>{icon}</span>
+                                                <div className={styles.notificationContent}>
+                                                    <div className={styles.notificationMessage}>{n.payload.message}</div>
+                                                    <div className={styles.notificationTime}>{timeAgo}</div>
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+                        
+                        {/* Modal Footer */}
+                        <div style={{
+                            padding: '15px 20px',
+                            borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                            textAlign: 'right'
+                        }}>
+                            <button
+                                onClick={() => setShowAllNotifications(false)}
+                                style={{
+                                    background: 'var(--brand)',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 20px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Documents Modal */}
+            {showDocuments && selectedShipmentForDocs && (
+                <div 
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: '20px'
+                    }}
+                    onClick={() => {
+                        setShowDocuments(false);
+                        setSelectedShipmentForDocs(null);
+                    }}
+                >
+                    <div 
+                        style={{
+                            background: isDarkMode ? '#1e293b' : 'white',
+                            borderRadius: '12px',
+                            maxWidth: '600px',
+                            width: '100%',
+                            maxHeight: '80vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div style={{
+                            padding: '20px',
+                            borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <h2 style={{ 
+                                margin: 0, 
+                                fontSize: '1.5rem',
+                                color: isDarkMode ? '#f1f5f9' : '#1e293b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                            }}>
+                                📄 Shipment Documents
+                            </h2>
+                            <button
+                                onClick={() => {
+                                    setShowDocuments(false);
+                                    setSelectedShipmentForDocs(null);
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '1.5rem',
+                                    cursor: 'pointer',
+                                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                                    padding: '4px',
+                                    lineHeight: 1
+                                }}
+                                aria-label="Close"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        {/* Modal Body */}
+                        <div style={{
+                            padding: '20px',
+                            flex: 1,
+                            overflowY: 'auto'
+                        }}>
+                            {(() => {
+                                const shipment = rows.find(r => r.id === selectedShipmentForDocs);
+                                if (!shipment) return null;
+                                
+                                return (
+                                    <>
+                                        <div style={{ 
+                                            marginBottom: '20px',
+                                            padding: '16px',
+                                            background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                                            borderRadius: '8px',
+                                            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`
+                                        }}>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                                Shipment ID: {String(shipment.id).slice(0, 8)}...
+                                            </div>
+                                            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text)' }}>
+                                                {shipment.origin} → {shipment.destination}
+                                            </div>
+                                            <div style={{ fontSize: '0.813rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                Status: <span style={{ 
+                                                    color: shipment.status === 'delivered' ? '#10b981' : 
+                                                           shipment.status === 'in_transit' ? '#3b82f6' : '#f59e0b',
+                                                    fontWeight: 600 
+                                                }}>{shipment.status}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <h3 style={{ 
+                                            fontSize: '1rem', 
+                                            fontWeight: 600,
+                                            marginBottom: '16px',
+                                            color: 'var(--text)'
+                                        }}>
+                                            Available Documents
+                                        </h3>
+                                        
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            {/* Waybill */}
+                                            <div style={{
+                                                padding: '16px',
+                                                background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'white',
+                                                border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                                                borderRadius: '8px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <span style={{ fontSize: '2rem' }}>📋</span>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '0.938rem' }}>
+                                                            Waybill
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                            Shipping manifest and details
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        alert('Waybill download will be implemented with backend integration');
+                                                    }}
+                                                    style={{
+                                                        background: 'var(--brand)',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        padding: '8px 16px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.813rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                                >
+                                                    📥 Download
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Invoice */}
+                                            <div style={{
+                                                padding: '16px',
+                                                background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'white',
+                                                border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                                                borderRadius: '8px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <span style={{ fontSize: '2rem' }}>🧾</span>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '0.938rem' }}>
+                                                            Invoice
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                            Payment details and breakdown
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        alert('Invoice download will be implemented with backend integration');
+                                                    }}
+                                                    style={{
+                                                        background: 'var(--brand)',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        padding: '8px 16px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.813rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                                >
+                                                    📥 Download
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Proof of Delivery - Only for delivered shipments */}
+                                            {shipment.status === 'delivered' && (
+                                                <div style={{
+                                                    padding: '16px',
+                                                    background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'white',
+                                                    border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        <span style={{ fontSize: '2rem' }}>✅</span>
+                                                        <div>
+                                                            <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '0.938rem' }}>
+                                                                Proof of Delivery (PoD)
+                                                            </div>
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                                Delivery confirmation and signature
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            alert('PoD download will be implemented with backend integration');
+                                                        }}
+                                                        style={{
+                                                            background: 'var(--brand)',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            padding: '8px 16px',
+                                                            borderRadius: '6px',
+                                                            fontSize: '0.813rem',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                                    >
+                                                        📥 Download
+                                                    </button>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Compliance Documents */}
+                                            <div style={{
+                                                padding: '16px',
+                                                background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'white',
+                                                border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                                                borderRadius: '8px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <span style={{ fontSize: '2rem' }}>📊</span>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '0.938rem' }}>
+                                                            Compliance Documents
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                            Permits, certificates, and licenses
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        alert('Compliance documents download will be implemented with backend integration');
+                                                    }}
+                                                    style={{
+                                                        background: 'var(--brand)',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        padding: '8px 16px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.813rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                                                >
+                                                    📥 Download
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {shipment.status !== 'delivered' && (
+                                            <div style={{
+                                                marginTop: '16px',
+                                                padding: '12px',
+                                                background: 'rgba(59, 130, 246, 0.1)',
+                                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                                borderRadius: '8px',
+                                                fontSize: '0.813rem',
+                                                color: '#3b82f6'
+                                            }}>
+                                                ℹ️ Proof of Delivery (PoD) will be available after shipment is delivered
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                        
+                        {/* Modal Footer */}
+                        <div style={{
+                            padding: '15px 20px',
+                            borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                💡 Documents are generated automatically
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowDocuments(false);
+                                    setSelectedShipmentForDocs(null);
+                                }}
+                                style={{
+                                    background: 'var(--brand)',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 20px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.875rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                                onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </>
     );

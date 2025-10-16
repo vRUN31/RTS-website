@@ -7,7 +7,13 @@ import { createTransporter, getEmailConfig, isEmailConfigured } from './config';
 import {
   generateTripAssignmentEmail,
   generateTripAssignmentTextEmail,
+  generateClientBookingApprovedEmail,
+  generateClientTripStartedEmail,
+  generateClientTripCompletedEmail,
   type TripAssignmentEmailData,
+  type ClientBookingApprovedEmailData,
+  type ClientTripStartedEmailData,
+  type ClientTripCompletedEmailData,
 } from './templates';
 
 export interface SendEmailResult {
@@ -133,5 +139,190 @@ export async function sendTestEmail(toEmail: string): Promise<SendEmailResult> {
   }
 }
 
+/**
+ * Send booking approval email to client
+ */
+export async function sendClientBookingApprovedEmail(
+  clientEmail: string,
+  bookingData: ClientBookingApprovedEmailData
+): Promise<SendEmailResult> {
+  try {
+    // Check if email is configured
+    if (!isEmailConfigured()) {
+      console.warn('⚠️ Email not configured. Skipping client email send.');
+      return {
+        success: false,
+        error: 'SMTP not configured. Please set environment variables.',
+      };
+    }
+
+    // Validate client email
+    if (!clientEmail || !isValidEmail(clientEmail)) {
+      console.error('❌ Invalid client email:', clientEmail);
+      return {
+        success: false,
+        error: 'Invalid client email address',
+      };
+    }
+
+    console.log(`📧 Preparing to send booking approval email to: ${clientEmail}`);
+
+    // Get config and create transporter
+    const config = getEmailConfig();
+    const transporter = await createTransporter();
+
+    // Generate email content
+    const htmlContent = generateClientBookingApprovedEmail(bookingData);
+
+    // Send email
+    const info = await transporter.sendMail({
+      from: `"${config.from.name}" <${config.from.email}>`,
+      to: clientEmail,
+      subject: `✅ Booking Approved - ${bookingData.sourceCity} → ${bookingData.destinationCity}`,
+      html: htmlContent,
+      replyTo: config.from.email,
+      priority: 'high',
+    });
+
+    console.log('✅ Client booking approval email sent successfully:', info.messageId);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+    };
+  } catch (error: any) {
+    console.error('❌ Failed to send client booking approval email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email',
+    };
+  }
+}
+
+/**
+ * Send trip started email to client
+ */
+export async function sendClientTripStartedEmail(
+  clientEmail: string,
+  tripData: ClientTripStartedEmailData
+): Promise<SendEmailResult> {
+  try {
+    // Check if email is configured
+    if (!isEmailConfigured()) {
+      console.warn('⚠️ Email not configured. Skipping client email send.');
+      return {
+        success: false,
+        error: 'SMTP not configured. Please set environment variables.',
+      };
+    }
+
+    // Validate client email
+    if (!clientEmail || !isValidEmail(clientEmail)) {
+      console.error('❌ Invalid client email:', clientEmail);
+      return {
+        success: false,
+        error: 'Invalid client email address',
+      };
+    }
+
+    console.log(`📧 Preparing to send trip started email to: ${clientEmail}`);
+
+    // Get config and create transporter
+    const config = getEmailConfig();
+    const transporter = await createTransporter();
+
+    // Generate email content
+    const htmlContent = generateClientTripStartedEmail(tripData);
+
+    // Send email
+    const info = await transporter.sendMail({
+      from: `"${config.from.name}" <${config.from.email}>`,
+      to: clientEmail,
+      subject: `🚛 Shipment Started - ${tripData.sourceCity} → ${tripData.destinationCity}`,
+      html: htmlContent,
+      replyTo: config.from.email,
+      priority: 'normal',
+    });
+
+    console.log('✅ Client trip started email sent successfully:', info.messageId);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+    };
+  } catch (error: any) {
+    console.error('❌ Failed to send client trip started email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email',
+    };
+  }
+}
+
+/**
+ * Send trip completed email to client
+ */
+export async function sendClientTripCompletedEmail(
+  clientEmail: string,
+  completionData: ClientTripCompletedEmailData
+): Promise<SendEmailResult> {
+  try {
+    // Check if email is configured
+    if (!isEmailConfigured()) {
+      console.warn('⚠️ Email not configured. Skipping client email send.');
+      return {
+        success: false,
+        error: 'SMTP not configured. Please set environment variables.',
+      };
+    }
+
+    // Validate client email
+    if (!clientEmail || !isValidEmail(clientEmail)) {
+      console.error('❌ Invalid client email:', clientEmail);
+      return {
+        success: false,
+        error: 'Invalid client email address',
+      };
+    }
+
+    console.log(`📧 Preparing to send trip completed email to: ${clientEmail}`);
+
+    // Get config and create transporter
+    const config = getEmailConfig();
+    const transporter = await createTransporter();
+
+    // Generate email content
+    const htmlContent = generateClientTripCompletedEmail(completionData);
+
+    // Send email
+    const info = await transporter.sendMail({
+      from: `"${config.from.name}" <${config.from.email}>`,
+      to: clientEmail,
+      subject: `🎉 Shipment Delivered - ${completionData.sourceCity} → ${completionData.destinationCity}`,
+      html: htmlContent,
+      replyTo: config.from.email,
+      priority: 'normal',
+    });
+
+    console.log('✅ Client trip completed email sent successfully:', info.messageId);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+    };
+  } catch (error: any) {
+    console.error('❌ Failed to send client trip completed email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email',
+    };
+  }
+}
+
 // Export types
-export type { TripAssignmentEmailData };
+export type {
+  TripAssignmentEmailData,
+  ClientBookingApprovedEmailData,
+  ClientTripStartedEmailData,
+  ClientTripCompletedEmailData,
+};

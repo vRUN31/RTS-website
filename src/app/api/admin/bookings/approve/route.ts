@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         origin: booking.source_city,
         destination: booking.destination_city,
         weight_mt: booking.weight_mt,
-        status: 'in_transit',
+        status: 'pending', // Changed from 'in_transit' - trip starts only when admin clicks "Start Trip"
         eta: eta.toISOString(),
         cost,
         created_at: new Date().toISOString(),

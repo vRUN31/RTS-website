@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/src/utils/supabase/server';
-import { sendDriverAssignmentEmail } from '@/src/utils/email';
+import { sendDriverAssignmentEmail, sendClientBookingApprovedEmail } from '@/src/utils/email';
+import { analyzeTripDetails } from '@/src/utils/operations';
 
 export async function GET() {
 	return NextResponse.json({ 
@@ -156,18 +157,20 @@ export async function POST(req: Request) {
 		// Fetch driver details for email notification
 		let driverEmail: string | null = null;
 		let driverName = 'Driver';
+		let driverPhone: string | null = null;
 		
 		if (truck.driver_id) {
 			const { data: driver, error: driverErr } = await supabase
 				.from('drivers')
-				.select('email, name')
+				.select('email, name, phone')
 				.eq('id', truck.driver_id)
 				.maybeSingle();
 				
 			if (!driverErr && driver) {
 				driverEmail = driver.email;
 				driverName = driver.name || 'Driver';
-				console.log('[approve api] Driver found:', { name: driverName, email: driverEmail ? '✓' : '✗' });
+				driverPhone = driver.phone;
+				console.log('[approve api] Driver found:', { name: driverName, email: driverEmail ? '✓' : '✗', phone: driverPhone ? '✓' : '✗' });
 			} else {
 				console.warn('[approve api] Could not fetch driver details:', driverErr?.message);
 			}
@@ -188,7 +191,7 @@ export async function POST(req: Request) {
 				origin: booking.source_city,
 				destination: booking.destination_city,
 				weight_mt: booking.weight_mt,
-				status: 'in_transit',
+				status: 'pending', // Changed from 'in_transit' - trip starts only when admin clicks "Start Trip"
 				eta: eta.toISOString(),
 				cost,
 				created_at: new Date().toISOString(),
@@ -230,15 +233,19 @@ export async function POST(req: Request) {
 		if (driverEmail) {
 			console.log('[approve api] Sending email notification to driver...');
 			try {
-				// Calculate estimated time based on distance
-				const distance = booking.estimated_distance || 500;
-				const avgSpeed = 50; // km/h average
-				const totalHours = distance / avgSpeed;
-				const days = Math.floor(totalHours / 24);
-				const hours = Math.floor(totalHours % 24);
-				const estimatedTime = days > 0 
-					? `${days} day${days > 1 ? 's' : ''} ${hours}h`
-					: `${hours}h ${Math.round((totalHours % 1) * 60)}m`;
+				// Use the same trip analysis logic as TripConfirmationModal for accuracy
+				const distance = booking.estimated_distance || 500; // fallback to 500km if not set
+				const pickupDate = booking.pickup_date ? new Date(booking.pickup_date) : undefined;
+				
+				// Analyze trip details using the operations utility (same as confirmation modal)
+				const tripAnalysis = analyzeTripDetails(distance, booking.vehicle_type || 'Truck (9T)', pickupDate);
+				
+				// Format estimated time in a user-friendly way
+				const estimatedTime = tripAnalysis.time.totalDays > 0
+					? `${tripAnalysis.time.totalDays} day${tripAnalysis.time.totalDays > 1 ? 's' : ''} (${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m)`
+					: `${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m`;
+
+				console.log(`[approve api] Calculated trip details: Distance=${tripAnalysis.distance}km, Time=${estimatedTime}`);
 
 				const emailResult = await sendDriverAssignmentEmail(driverEmail, {
 					driverName,
@@ -246,8 +253,8 @@ export async function POST(req: Request) {
 					bookingId,
 					sourceCity: booking.source_city,
 					destinationCity: booking.destination_city,
-					distance,
-					estimatedTime,
+					distance: tripAnalysis.distance, // Use calculated distance
+					estimatedTime, // Use calculated time
 					pickupDate: booking.pickup_date 
 						? new Date(booking.pickup_date).toLocaleDateString('en-IN', { 
 							day: 'numeric', 
@@ -258,7 +265,7 @@ export async function POST(req: Request) {
 					material: booking.material || undefined,
 					weight: booking.weight_mt || undefined,
 					vehicleType: booking.vehicle_type || 'Standard Truck',
-					specialInstructions: undefined, // Can be added if needed
+					specialInstructions: booking.notes || undefined, // Include any booking notes as special instructions
 				});
 
 				if (emailResult.success) {
@@ -272,6 +279,114 @@ export async function POST(req: Request) {
 			}
 		} else {
 			console.warn('⚠️ [approve api] No driver email available, skipping email notification');
+		}
+
+		// Send email notification to client
+		console.log('[approve api] Sending email notification to client...');
+		console.log('[approve api] Client ID:', booking.client_id);
+		try {
+			// IMPORTANT: Check if client_id exists first
+			if (!booking.client_id) {
+				console.warn('⚠️ [approve api] Booking has no client_id - using user_id as fallback');
+				// Try to use user_id if client_id is missing
+				const clientIdToUse = booking.client_id || booking.user_id;
+				
+				if (!clientIdToUse) {
+					console.error('❌ [approve api] No client_id or user_id found - cannot send client email');
+					throw new Error('Cannot determine client ID');
+				}
+			}
+			
+			// Get client email from profiles table (use 'name' not 'full_name')
+			const clientIdForEmail = booking.client_id || booking.user_id;
+			const { data: clientProfile, error: profileError } = await supabase
+				.from('profiles')
+				.select('email, name')
+				.eq('id', clientIdForEmail)
+				.single();
+
+			console.log('[approve api] Client profile fetch result:', { 
+				clientId: clientIdForEmail,
+				found: !!clientProfile, 
+				hasEmail: !!clientProfile?.email,
+				email: clientProfile?.email,
+				name: clientProfile?.name,
+				error: profileError?.message 
+			});
+
+			if (clientProfile?.email) {
+				console.log('[approve api] Preparing client email data...');
+				
+				// Use the same trip analysis logic for accuracy
+				const distance = booking.estimated_distance || 500;
+				const pickupDate = booking.pickup_date ? new Date(booking.pickup_date) : undefined;
+				const tripAnalysis = analyzeTripDetails(distance, booking.vehicle_type || 'Truck (9T)', pickupDate);
+				
+				if (!tripAnalysis) {
+					console.error('[approve api] ❌ Trip analysis failed - cannot send client email');
+					throw new Error('Trip analysis failed');
+				}
+				
+				console.log('[approve api] Trip analysis:', {
+					distance: tripAnalysis.distance,
+					time: `${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m`,
+					days: tripAnalysis.time.totalDays
+				});
+				
+				// Format estimated time
+				const estimatedTime = tripAnalysis.time.totalDays > 0
+					? `${tripAnalysis.time.totalDays} day${tripAnalysis.time.totalDays > 1 ? 's' : ''} (${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m)`
+					: `${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m`;
+
+				// Calculate estimated arrival date
+				const totalMinutes = (tripAnalysis.time.drivingHours * 60) + tripAnalysis.time.drivingMinutes;
+				const estimatedArrivalDate = pickupDate 
+					? new Date(pickupDate.getTime() + (totalMinutes * 60000))
+					: new Date(Date.now() + (totalMinutes * 60000));
+				
+				const estimatedArrival = estimatedArrivalDate.toLocaleDateString('en-IN', { 
+					day: 'numeric', 
+					month: 'short', 
+					year: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit'
+				});
+
+				const clientEmailResult = await sendClientBookingApprovedEmail(clientProfile.email, {
+					customerName: clientProfile.name || 'Valued Customer',
+					bookingId,
+					sourceCity: booking.source_city,
+					destinationCity: booking.destination_city,
+					distance: tripAnalysis.distance,
+					estimatedTime,
+					estimatedArrival,
+					pickupDate: booking.pickup_date 
+						? new Date(booking.pickup_date).toLocaleDateString('en-IN', { 
+							day: 'numeric', 
+							month: 'short', 
+							year: 'numeric' 
+						})
+						: 'TBD',
+					material: booking.material || undefined,
+					weight: booking.weight_mt || undefined,
+					vehicleType: booking.vehicle_type || 'Standard Truck',
+					truckPlate: truck.plate || truckId.slice(0, 8).toUpperCase(),
+					driverName,
+					driverPhone: driverPhone || undefined,
+					trackingUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard/customer`,
+				});
+
+				if (clientEmailResult.success) {
+					console.log('✅ [approve api] Client email sent successfully to:', clientProfile.email);
+				} else {
+					console.warn('⚠️ [approve api] Client email send failed:', clientEmailResult.error);
+				}
+			} else {
+				console.warn('⚠️ [approve api] No client email available, skipping client notification');
+			}
+		} catch (clientEmailError: any) {
+			console.error('❌ [approve api] Client email error:', clientEmailError.message);
+			// Don't fail the main operation for email errors
 		}
 
 		console.log('[API approve] Success - booking approved');

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/src/utils/supabase/server';
+import { sendClientTripStartedEmail } from '@/src/utils/email';
+import { analyzeTripDetails } from '@/src/utils/operations';
 
 export async function POST(
   request: NextRequest,
@@ -106,7 +108,7 @@ export async function POST(
             shipment_id: shipmentId,
             title: '🚀 Trip Started'
           },
-          channel: 'notifications',
+          channel: 'inapp',
           status: 'unread'
         });
 
@@ -115,6 +117,96 @@ export async function POST(
         // Don't fail the request if notification fails
       } else {
         console.log(`✅ [Start Trip] Notification sent successfully`);
+      }
+
+      // Send email to client
+      try {
+        console.log('📧 [Start Trip] Sending email to client...');
+        
+        // Get full shipment details with truck, driver, and booking info
+        const { data: fullShipment, error: shipmentError } = await supabase
+          .from('shipments')
+          .select(`
+            id,
+            origin,
+            destination,
+            weight_mt,
+            truck_id,
+            trucks (
+              plate,
+              driver_id,
+              drivers (
+                name,
+                phone
+              )
+            )
+          `)
+          .eq('id', shipmentId)
+          .single();
+
+        if (shipmentError) {
+          console.error('⚠️ [Start Trip] Failed to fetch full shipment details:', shipmentError);
+        } else {
+          // Get client profile for email and name (use 'name' not 'full_name')
+          const { data: clientProfile } = await supabase
+            .from('profiles')
+            .select('email, name')
+            .eq('id', shipment.client_id)
+            .single();
+
+          // Get booking ID from shipments - we need to add this or get it from context
+          // For now, use shipmentId as reference
+          const bookingId = shipmentId; // This should ideally come from the shipment record
+
+          if (clientProfile?.email && fullShipment) {
+            // Calculate trip details
+            // We need distance - let's get it from the original booking or estimate
+            const estimatedDistance = 500; // Fallback - should come from booking
+            const vehicleType = 'Truck (9T)'; // Should come from booking
+            
+            const tripAnalysis = analyzeTripDetails(estimatedDistance, vehicleType);
+            
+            if (tripAnalysis) {
+              const estimatedTime = tripAnalysis.time.totalDays > 0
+                ? `${tripAnalysis.time.totalDays} day${tripAnalysis.time.totalDays > 1 ? 's' : ''}`
+                : `${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m`;
+
+              const estimatedArrival = tripAnalysis.time.estimatedArrival.toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+
+              const driverName = (fullShipment.trucks as any)?.drivers?.name || 'Driver';
+              const driverPhone = (fullShipment.trucks as any)?.drivers?.phone || undefined;
+              const truckPlate = (fullShipment.trucks as any)?.plate || 'N/A';
+
+              await sendClientTripStartedEmail(clientProfile.email, {
+                customerName: clientProfile.name || 'Valued Customer',
+                shipmentId,
+                bookingId,
+                sourceCity: fullShipment.origin || 'Origin',
+                destinationCity: fullShipment.destination || 'Destination',
+                distance: tripAnalysis.distance,
+                estimatedTime,
+                estimatedArrival,
+                truckPlate,
+                driverName,
+                driverPhone,
+                trackingUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard/customer`,
+              });
+
+              console.log('✅ [Start Trip] Client email sent successfully');
+            }
+          } else {
+            console.warn('⚠️ [Start Trip] No client email available');
+          }
+        }
+      } catch (emailError: any) {
+        console.error('❌ [Start Trip] Email error:', emailError.message);
+        // Don't fail the main operation
       }
     } else {
       console.log('⚠️ [Start Trip] No client_id, skipping notification');

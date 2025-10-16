@@ -17,6 +17,10 @@ type TruckRow = {
     license_no: string | null;
     license_expiry: string | null;
   } | null;
+  // Active trip information
+  isOnActiveTrip?: boolean;
+  activeTripId?: string;
+  activeTripDestination?: string;
 };
 
 export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
@@ -75,10 +79,35 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
           .in('id', driverIds);
         driverMap = Object.fromEntries((driversList ?? []).map((d: any) => [d.id, d]));
       }
-      const rows: TruckRow[] = (trucksList ?? []).map((t: any) => ({
-        ...t,
-        driver: t.driver_id ? driverMap[t.driver_id] ?? null : null,
-      }));
+
+      // Fetch active shipments to check which trucks are already on trips
+      const { data: activeShipments } = await supabase
+        .from('shipments')
+        .select('id, truck_id, destination, status')
+        .not('status', 'in', '("delivered","cancelled")')
+        .not('truck_id', 'is', null);
+
+      // Create a map of truck_id -> active trip info
+      const activeTripMap: Record<string, { tripId: string; destination: string }> = {};
+      (activeShipments ?? []).forEach((shipment: any) => {
+        if (shipment.truck_id) {
+          activeTripMap[shipment.truck_id] = {
+            tripId: shipment.id,
+            destination: shipment.destination || 'Unknown'
+          };
+        }
+      });
+
+      const rows: TruckRow[] = (trucksList ?? []).map((t: any) => {
+        const activeTrip = activeTripMap[t.id];
+        return {
+          ...t,
+          driver: t.driver_id ? driverMap[t.driver_id] ?? null : null,
+          isOnActiveTrip: !!activeTrip,
+          activeTripId: activeTrip?.tripId,
+          activeTripDestination: activeTrip?.destination,
+        };
+      });
       if (mounted) setTrucks(rows);
     })();
     return () => { mounted = false; };
@@ -151,6 +180,10 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
 
   const selectedTruck = trucks.find(t => t.id === selected);
 
+  // Separate available and unavailable trucks
+  const availableTrucks = trucks.filter(t => !t.isOnActiveTrip);
+  const unavailableTrucks = trucks.filter(t => t.isOnActiveTrip);
+
   const overlay = (
     <>
       <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Assign Truck">
@@ -161,39 +194,178 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
           </div>
           <div className="modal-body">
             {error && <div className="error-banner">{error}</div>}
+            
+            {/* Summary Stats */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px', 
+              marginBottom: '16px', 
+              padding: '12px', 
+              background: '#f6f6f6', 
+              borderRadius: '6px',
+              fontSize: '14px'
+            }}>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 600, color: '#28a745' }}>{availableTrucks.length}</div>
+                <div style={{ color: '#666', fontSize: '12px' }}>Available</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 600, color: '#dc3545' }}>{unavailableTrucks.length}</div>
+                <div style={{ color: '#666', fontSize: '12px' }}>On Active Trip</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 600, color: '#333' }}>{trucks.length}</div>
+                <div style={{ color: '#666', fontSize: '12px' }}>Total Trucks</div>
+              </div>
+            </div>
+
             <div className="list-scroll">
-              {trucks.map(t => (
-                <label key={t.id} className={`list-row ${selected === t.id ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="truck"
-                    value={t.id}
-                    checked={selected === t.id}
-                    onChange={() => setSelected(t.id)}
-                    disabled={showConfirmation}
-                  />
-                  <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
-                  <div className="list-col plate">{t.plate ?? '—'}</div>
-                  <div className="list-col status">{t.status ?? '—'}</div>
-                  <div className="list-col driver">
-                    {t.driver ? (
-                      <>
-                        <div className="driver-name">{t.driver.name}</div>
-                        <div className="driver-small">{t.driver.phone} • Lic: {t.driver.license_no} (exp {t.driver.license_expiry ?? '—'})</div>
-                      </>
-                    ) : t.driver_id ? (
-                      <div className="driver-name muted-small">Driver record missing ({String(t.driver_id).slice(0,8)}…)</div>
-                    ) : (
-                      <div className="driver-name muted-small">No driver linked</div>
-                    )}
+              {/* Available Trucks Section */}
+              {availableTrucks.length > 0 && (
+                <>
+                  <div style={{ 
+                    padding: '8px 12px', 
+                    background: '#e7f5ed', 
+                    border: '1px solid #28a745', 
+                    borderRadius: '4px',
+                    marginBottom: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#155724'
+                  }}>
+                    ✅ Available Trucks ({availableTrucks.length})
                   </div>
-                  <div className="list-col updated">{t.last_updated?.slice(0,10) ?? '—'}</div>
-                </label>
-              ))}
+                  {availableTrucks.map(t => (
+                    <label key={t.id} className={`list-row ${selected === t.id ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="truck"
+                        value={t.id}
+                        checked={selected === t.id}
+                        onChange={() => setSelected(t.id)}
+                        disabled={showConfirmation}
+                      />
+                      <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
+                      <div className="list-col plate">{t.plate ?? '—'}</div>
+                      <div className="list-col status">{t.status ?? '—'}</div>
+                      <div className="list-col driver">
+                        {t.driver ? (
+                          <>
+                            <div className="driver-name">{t.driver.name}</div>
+                            <div className="driver-small">{t.driver.phone} • Lic: {t.driver.license_no} (exp {t.driver.license_expiry ?? '—'})</div>
+                          </>
+                        ) : t.driver_id ? (
+                          <div className="driver-name muted-small">Driver record missing ({String(t.driver_id).slice(0,8)}…)</div>
+                        ) : (
+                          <div className="driver-name muted-small">No driver linked</div>
+                        )}
+                      </div>
+                      <div className="list-col updated">{t.last_updated?.slice(0,10) ?? '—'}</div>
+                    </label>
+                  ))}
+                </>
+              )}
+
+              {/* Unavailable Trucks Section */}
+              {unavailableTrucks.length > 0 && (
+                <>
+                  <div style={{ 
+                    padding: '8px 12px', 
+                    background: '#f8d7da', 
+                    border: '1px solid #dc3545', 
+                    borderRadius: '4px',
+                    marginTop: availableTrucks.length > 0 ? '16px' : '0',
+                    marginBottom: '8px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#721c24'
+                  }}>
+                    🚫 Unavailable - On Active Trip ({unavailableTrucks.length})
+                  </div>
+                  {unavailableTrucks.map(t => (
+                    <div 
+                      key={t.id} 
+                      className="list-row" 
+                      style={{ 
+                        opacity: 0.6, 
+                        background: '#f8f9fa',
+                        cursor: 'not-allowed',
+                        position: 'relative'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="truck"
+                        value={t.id}
+                        disabled={true}
+                        style={{ cursor: 'not-allowed' }}
+                      />
+                      <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
+                      <div className="list-col plate">{t.plate ?? '—'}</div>
+                      <div className="list-col status">
+                        <span style={{ color: '#dc3545', fontWeight: 600 }}>🚛 In Transit</span>
+                      </div>
+                      <div className="list-col driver">
+                        {t.driver ? (
+                          <>
+                            <div className="driver-name">{t.driver.name}</div>
+                            <div className="driver-small" style={{ color: '#dc3545', fontWeight: 500 }}>
+                              🚨 Currently en route to: {t.activeTripDestination}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="driver-name muted-small">No driver</div>
+                        )}
+                      </div>
+                      <div className="list-col updated">
+                        <span style={{ 
+                          fontSize: '11px', 
+                          background: '#dc3545', 
+                          color: 'white', 
+                          padding: '2px 6px', 
+                          borderRadius: '3px' 
+                        }}>
+                          BUSY
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {trucks.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚛</div>
+                  <div>No trucks found in the system</div>
+                </div>
+              )}
+
+              {availableTrucks.length === 0 && trucks.length > 0 && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '20px', 
+                  background: '#fff3cd', 
+                  border: '1px solid #ffc107',
+                  borderRadius: '6px',
+                  marginTop: '16px'
+                }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
+                  <div style={{ fontWeight: 600, color: '#856404', marginBottom: '4px' }}>
+                    All trucks are currently on active trips
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#856404' }}>
+                    Please wait for a truck to complete its delivery before assigning a new booking
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="modal-footer">
-            <button className="btn-dark" disabled={!selected || loading || showConfirmation} onClick={handleAssignClick}>
+            <button 
+              className="btn-dark" 
+              disabled={!selected || loading || showConfirmation || (selectedTruck?.isOnActiveTrip)} 
+              onClick={handleAssignClick}
+            >
               {loading ? 'Processing…' : 'Continue to Confirmation'}
             </button>
           </div>

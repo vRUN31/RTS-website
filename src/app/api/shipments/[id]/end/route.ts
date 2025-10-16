@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/src/utils/supabase/server';
+import { sendClientTripCompletedEmail } from '@/src/utils/email';
+import { analyzeTripDetails } from '@/src/utils/operations';
 
 export async function POST(
   request: NextRequest,
@@ -107,7 +109,7 @@ export async function POST(
             shipment_id: shipmentId,
             title: '🏁 Trip Completed'
           },
-          channel: 'notifications',
+          channel: 'inapp',
           status: 'unread'
         });
 
@@ -116,6 +118,97 @@ export async function POST(
         // Don't fail the request if notification fails
       } else {
         console.log(`✅ [End Trip] Notification sent successfully`);
+      }
+
+      // Send email to client
+      try {
+        console.log('📧 [End Trip] Sending delivery confirmation email to client...');
+        
+        // Get full shipment details with truck, driver info, and timestamps
+        const { data: fullShipment, error: shipmentError } = await supabase
+          .from('shipments')
+          .select(`
+            id,
+            origin,
+            destination,
+            weight_mt,
+            created_at,
+            delivered_at,
+            truck_id,
+            trucks (
+              plate,
+              driver_id,
+              drivers (
+                name,
+                phone
+              )
+            )
+          `)
+          .eq('id', shipmentId)
+          .single();
+
+        if (shipmentError) {
+          console.error('⚠️ [End Trip] Failed to fetch full shipment details:', shipmentError);
+        } else {
+          // Get client profile for email and name (use 'name' not 'full_name')
+          const { data: clientProfile } = await supabase
+            .from('profiles')
+            .select('email, name')
+            .eq('id', shipment.client_id)
+            .single();
+
+          const bookingId = shipmentId; // Should ideally come from shipment record
+
+          if (clientProfile?.email && fullShipment) {
+            // Calculate actual trip time
+            const startTime = fullShipment.created_at ? new Date(fullShipment.created_at) : new Date();
+            const endTime = fullShipment.delivered_at ? new Date(fullShipment.delivered_at) : new Date();
+            const tripDurationMs = endTime.getTime() - startTime.getTime();
+            const tripHours = Math.floor(tripDurationMs / (1000 * 60 * 60));
+            const tripMinutes = Math.floor((tripDurationMs % (1000 * 60 * 60)) / (1000 * 60));
+            const tripDays = Math.floor(tripHours / 24);
+            
+            const actualTime = tripDays > 0
+              ? `${tripDays} day${tripDays > 1 ? 's' : ''} ${tripHours % 24}h ${tripMinutes}m`
+              : `${tripHours}h ${tripMinutes}m`;
+
+            const deliveryDate = endTime.toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+
+            const estimatedDistance = 500; // Should come from booking
+            
+            const driverName = (fullShipment.trucks as any)?.drivers?.name || 'Driver';
+            const driverPhone = (fullShipment.trucks as any)?.drivers?.phone || undefined;
+            const truckPlate = (fullShipment.trucks as any)?.plate || 'N/A';
+
+            await sendClientTripCompletedEmail(clientProfile.email, {
+              customerName: clientProfile.name || 'Valued Customer',
+              shipmentId,
+              bookingId,
+              sourceCity: fullShipment.origin || 'Origin',
+              destinationCity: fullShipment.destination || 'Destination',
+              distance: estimatedDistance,
+              actualTime,
+              deliveryDate,
+              truckPlate,
+              driverName,
+              driverPhone,
+              documentsUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/dashboard/customer`,
+            });
+
+            console.log('✅ [End Trip] Client delivery email sent successfully');
+          } else {
+            console.warn('⚠️ [End Trip] No client email available');
+          }
+        }
+      } catch (emailError: any) {
+        console.error('❌ [End Trip] Email error:', emailError.message);
+        // Don't fail the main operation
       }
     } else {
       console.log('⚠️ [End Trip] No client_id, skipping notification');
