@@ -736,11 +736,11 @@ graph TB
         end
 
         subgraph "API Routes"
-            BookingApprove[/api/bookings/approve]
-            BookingReject[/api/bookings/reject]
-            ShipmentStart[/api/shipments/:id/start]
-            ShipmentEnd[/api/shipments/:id/end]
-            ExportShipments[/api/admin/export/shipments]
+            BookingApprove["POST /api/bookings/approve"]
+            BookingReject["POST /api/bookings/reject"]
+            ShipmentStart["POST /api/shipments/:id/start"]
+            ShipmentEnd["POST /api/shipments/:id/end"]
+            ExportShipments["GET /api/admin/export/shipments"]
         end
 
         subgraph "Components"
