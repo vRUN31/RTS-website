@@ -1106,22 +1106,22 @@ graph TD
 
     subgraph "Web Server / Hosting"
         NextJS[<i class='fa fa-server'></i> Next.js on Vercel]
-        NextJS_Server[Server Components &<br/>Server Actions]
-        NextJS_Client[Client Components<br/>(e.g., Maps, Forms)]
-        NextJS_Auth[Authentication Logic<br/>(Role-based routing)]
+        NextJS_Server[Server Components &amp;br&gt;Server Actions]
+        NextJS_Client[Client Components&lt;br/&gt;e.g., Maps, Forms]
+        NextJS_Auth[Authentication Logic&lt;br/&gt;(Role-based routing)]
     end
 
     subgraph "Backend-as-a-Service (Supabase)"
         Supabase_Auth[<i class='fa fa-fingerprint'></i> Supabase Auth]
-        Supabase_DB[<i class='fa fa-database'></i> PostgreSQL Database<br/>- Shipments<br/>- Contracts<br/>- Telemetry]
+        Supabase_DB[<i class='fa fa-database'></i> PostgreSQL Database&lt;br/&gt;- Shipments&lt;br/&gt;- Contracts&lt;br/&gt;- Telemetry]
         Supabase_Realtime[<i class='fa fa-broadcast-tower'></i> Supabase Realtime]
-        Supabase_Storage[<i class='fa fa-file-archive'></i> Supabase Storage<br/>(For Documents)]
+        Supabase_Storage[<i class='fa fa-file-archive'></i> Supabase Storage&lt;br/&gt;(For Documents)]
     end
 
     %% User Interactions
     Admin ---|1. Accesses via HTTPS| Browser
     Customer ---|1. Accesses via HTTPS| Browser
-    Browser <-->|2. Renders UI &<br/>Sends Requests| NextJS
+    Browser <-->|2. Renders UI &amp;br&gt;Sends Requests| NextJS
 
     %% Next.js Internal Flow
     NextJS --- NextJS_Server
@@ -1130,9 +1130,9 @@ graph TD
 
     %% Authentication Flow
     NextJS_Auth ---|3. Authenticates User| Supabase_Auth
-    Supabase_Auth -->|4. Returns User Session & Role| NextJS_Auth
+    Supabase_Auth -->|4. Returns User Session &amp; Role| NextJS_Auth
 
-    %% Data Flow for Server Components (e.g., loading dashboards)
+    %% Data Flow for Server Components
     NextJS_Server ---|5. Fetches Data (Contracts, Shipments)| Supabase_DB
     Supabase_DB -->|6. Returns Data| NextJS_Server
 
@@ -1143,9 +1143,7 @@ graph TD
     Supabase_DB -- notifies --> Supabase_Realtime
     Supabase_Realtime ---|8. Pushes Live GPS Updates| Browser
 
-    %% Link to Font Awesome for Icons
-    linkStyle default text-decoration:none,fill:transparent,stroke:transparent;
-
+    %% Styling
     classDef default fill:#2d3436,stroke:#dfe6e9,stroke-width:2px,color:#dfe6e9;
     classDef subgraph fill:#1e272e,color:#dfe6e9;
     class Admin,Customer,TruckGPS,Browser,NextJS fill:#0984e3,color:white;
