@@ -19,8 +19,8 @@
 
 ## 🎯 Project Status
 
-**Last Updated:** October 15, 2025  
-**Version:** 2.0  
+**Last Updated:** October 17, 2025  
+**Version:** 2.1  
 **Status:** ✅ **Production-Ready Core Features** | 🚧 **Advanced Features In Progress**
 
 ---
@@ -325,7 +325,33 @@
   - Unread message indicators
   - Real-time updates
 
-### 🔧 Settings
+### � Notifications
+- ✅ **Real-time Notifications**
+  - Booking approval notifications
+  - Booking rejection notifications
+  - In-app notification display
+  - Supabase Realtime integration
+- ✅ **Notification Badges**
+  - Chat notification counts
+  - Unread message indicators
+  - Real-time updates
+- ✅ **Email Notification System** (COMPLETED - Oct 16, 2025)
+  - Professional HTML email templates
+  - Driver trip assignment emails
+  - Client booking approval emails
+  - Client trip started emails
+  - Client trip completed emails
+  - SMTP integration with nodemailer
+  - Accurate trip data with `analyzeTripDetails()`
+  - Distance, time, cost calculations
+  - Driver contact information
+  - Route visualization in emails
+  - Graceful error handling (non-blocking)
+  - Email logging to database
+  - Plain text fallback
+  - Mobile-responsive email design
+
+### �🔧 Settings
 - ✅ **User Settings Page** (`/settings`)
   - Profile settings (phone, company, emergency contact)
   - Appearance (theme, accent color, font size, view density)
@@ -341,15 +367,10 @@
 ### 🚧 In Progress
 
 #### 🔔 Advanced Notifications
-- ⏳ **Email Notifications**
-  - Driver trip assignment emails
-  - Booking confirmation emails
-  - Shipment status update emails
-  - *Status:* Infrastructure ready, templates needed
 - ⏳ **SMS Notifications**
   - OTP verification
   - Critical alerts
-  - *Status:* Third-party integration pending
+  - *Status:* Third-party integration pending (Twilio/AWS SNS)
 
 #### 📄 Document Management
 - ⏳ **Supabase Storage Integration**
@@ -597,9 +618,24 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS=rajmohantransport.com,admin.rts.in
 NEXT_PUBLIC_ADMIN_EMAILS=admin@example.com,ceo@example.com
 
+# SMTP Email Configuration (for driver and client notifications)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM_NAME=Rajmohan Transport Services
+SMTP_FROM_EMAIL=notifications@rajmohantransport.com
+
 # Optional: Third-party APIs
 NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
 ```
+
+> **📧 Email Setup Note**: For email notifications to work, you need to configure SMTP credentials. For Gmail:
+> 1. Enable 2-factor authentication on your Google account
+> 2. Generate an "App Password" at https://myaccount.google.com/apppasswords
+> 3. Use the app password (not your regular password) in `SMTP_PASS`
+> 4. Emails will be sent to drivers when bookings are approved and to clients for trip updates
 
 ### 3. Supabase Database Setup
 
@@ -662,6 +698,178 @@ npm run dev
 ---
 
 ## 📁 Architecture
+
+### System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Browser[Web Browser]
+        Mobile[Mobile Browser]
+    end
+
+    subgraph "Next.js 15 App Router"
+        subgraph "Public Routes"
+            Login[Login Page]
+            Register[Register Page]
+            ForgotPW[Forgot Password]
+        end
+
+        subgraph "Admin Routes"
+            AdminDash[Admin Dashboard<br/>KPIs, Map, Bookings]
+            Analytics[Analytics<br/>Charts & Reports]
+            Fleet[Fleet Management<br/>Trucks, Drivers, Trips]
+            ManageTrucks[Manage Trucks<br/>CRUD Operations]
+            AdminSupport[Support Chat]
+            ExportAPI[CSV Export API]
+        end
+
+        subgraph "Client Routes"
+            ClientDash[Client Dashboard<br/>Bookings, Shipments]
+            BookingsPage[Bookings Page<br/>Search, Filter, Modal]
+            Contracts[Contracts List]
+        end
+
+        subgraph "Shared Routes"
+            Settings[Settings Page]
+            SharedContracts[Contracts View]
+        end
+
+        subgraph "API Routes"
+            BookingApprove[/api/bookings/approve]
+            BookingReject[/api/bookings/reject]
+            ShipmentStart[/api/shipments/:id/start]
+            ShipmentEnd[/api/shipments/:id/end]
+            ExportShipments[/api/admin/export/shipments]
+        end
+
+        subgraph "Components"
+            LeafletMap[LeafletMap.client<br/>Real-time GPS]
+            AdminAnalytics[AdminAnalytics.client<br/>Chart.js Charts]
+            BookingModal[Booking Details Modal]
+            AssignTruckModal[Assign Truck Modal]
+            ChatComponent[Instagram Chat]
+        end
+    end
+
+    subgraph "Supabase Backend"
+        subgraph "Authentication"
+            SupaAuth[Supabase Auth<br/>Email/Password, JWT]
+            RLS[Row Level Security<br/>is_admin helper]
+        end
+
+        subgraph "PostgreSQL Database"
+            ProfilesTable[(profiles<br/>role, client_id)]
+            BookingsTable[(bookings<br/>status, user_id)]
+            ShipmentsTable[(shipments<br/>truck_id, status)]
+            TrucksTable[(trucks<br/>driver_id, location)]
+            DriversTable[(drivers<br/>name, email, phone)]
+            TelemetryTable[(telemetry<br/>lat, lng, speed)]
+            ContractsTable[(contracts<br/>client_id, rates)]
+            TripsTable[(trips<br/>distance, cost)]
+            MaintenanceTable[(maintenance_records)]
+            FuelTable[(fuel_records)]
+            RoutesTable[(optimized_routes<br/>waypoints JSONB)]
+            NotificationsTable[(notifications<br/>type, read)]
+            SettingsTable[(user_settings<br/>theme, language)]
+        end
+
+        subgraph "Realtime"
+            RealtimeBookings[Bookings Channel]
+            RealtimeTelemetry[Telemetry Channel]
+            RealtimeNotif[Notifications Channel]
+        end
+    end
+
+    subgraph "External Services"
+        OSM[OpenStreetMap<br/>Map Tiles]
+        Nominatim[Nominatim API<br/>Geocoding]
+        OSRM[OSRM API<br/>Routing & Distance]
+        SMTP[SMTP Server<br/>nodemailer]
+    end
+
+    subgraph "Email System"
+        EmailTemplates[HTML Email Templates<br/>Driver & Client]
+        EmailService[Email Service<br/>analyzeTripDetails]
+    end
+
+    %% Client to Next.js
+    Browser --> Login
+    Browser --> AdminDash
+    Browser --> ClientDash
+    Mobile --> ClientDash
+
+    %% Authentication Flow
+    Login --> SupaAuth
+    Register --> SupaAuth
+    SupaAuth --> ProfilesTable
+    SupaAuth --> RLS
+
+    %% Admin Routes to Components
+    AdminDash --> LeafletMap
+    AdminDash --> AssignTruckModal
+    Analytics --> AdminAnalytics
+    Fleet --> ManageTrucks
+
+    %% Client Routes to Components
+    ClientDash --> LeafletMap
+    ClientDash --> ChatComponent
+    BookingsPage --> BookingModal
+
+    %% API to Database
+    BookingApprove --> BookingsTable
+    BookingApprove --> ShipmentsTable
+    BookingApprove --> EmailService
+    BookingReject --> BookingsTable
+    ShipmentStart --> ShipmentsTable
+    ShipmentStart --> EmailService
+    ShipmentEnd --> ShipmentsTable
+    ShipmentEnd --> EmailService
+
+    %% Email System
+    EmailService --> EmailTemplates
+    EmailTemplates --> SMTP
+
+    %% Components to Database
+    LeafletMap --> TelemetryTable
+    LeafletMap --> TrucksTable
+    AssignTruckModal --> TrucksTable
+    AssignTruckModal --> DriversTable
+    AdminAnalytics --> ShipmentsTable
+    AdminAnalytics --> TrucksTable
+    AdminAnalytics --> TripsTable
+
+    %% Realtime Subscriptions
+    RealtimeBookings -.->|Live Updates| BookingsPage
+    RealtimeBookings -.->|Live Updates| AdminDash
+    RealtimeTelemetry -.->|Live Updates| LeafletMap
+    RealtimeNotif -.->|Live Updates| ChatComponent
+
+    %% External Services
+    LeafletMap --> OSM
+    ClientDash --> Nominatim
+    ClientDash --> OSRM
+    EmailService --> SMTP
+
+    %% RLS Protection
+    RLS -.->|Protect| BookingsTable
+    RLS -.->|Protect| ShipmentsTable
+    RLS -.->|Protect| TrucksTable
+    RLS -.->|Protect| ContractsTable
+
+    %% Styling
+    classDef adminClass fill:#ff9800,stroke:#e65100,color:#000
+    classDef clientClass fill:#4caf50,stroke:#2e7d32,color:#fff
+    classDef dbClass fill:#2196f3,stroke:#0d47a1,color:#fff
+    classDef externalClass fill:#9c27b0,stroke:#4a148c,color:#fff
+    classDef realtimeClass fill:#00bcd4,stroke:#006064,color:#000
+
+    class AdminDash,Analytics,Fleet,ManageTrucks,AdminSupport,ExportAPI adminClass
+    class ClientDash,BookingsPage,Contracts clientClass
+    class ProfilesTable,BookingsTable,ShipmentsTable,TrucksTable,DriversTable,TelemetryTable,ContractsTable,TripsTable,MaintenanceTable,FuelTable,RoutesTable,NotificationsTable,SettingsTable dbClass
+    class OSM,Nominatim,OSRM,SMTP externalClass
+    class RealtimeBookings,RealtimeTelemetry,RealtimeNotif realtimeClass
+```
 
 ### Project Structure
 
@@ -854,9 +1062,16 @@ const channel = supabase
 - [x] Fleet management expansion (trips, maintenance, fuel)
 - [x] Route optimization module
 - [x] Profit/loss analytics per truck
-- [ ] Email notifications (templates pending)
+- [x] Email notifications (Oct 16-17, 2025) ✅
+  - [x] Driver trip assignment emails
+  - [x] Client booking approval emails
+  - [x] Client trip started emails
+  - [x] Client trip completed emails
+  - [x] Professional HTML templates
+  - [x] SMTP integration
+- [x] Settings page with user preferences (Oct 2025)
 - [ ] Document uploads with Supabase Storage
-- [ ] Advanced analytics reports
+- [ ] Advanced analytics reports with PDF export
 - [ ] ETA prediction with routing service integration
 
 ### 📋 Phase 3: Business Intelligence (Q1 2026)
@@ -912,7 +1127,10 @@ const channel = supabase
 - `CONTRACT_FEATURES.md` - Contract management features
 - `FLEET_MANAGEMENT_FEATURES.md` - Fleet module overview
 - `VEHICLE_TYPE_FEATURE.md` - Vehicle type selection
-- `EMAIL_NOTIFICATION_SYSTEM.md` - Notification infrastructure
+- `EMAIL_NOTIFICATION_SYSTEM.md` - Email system complete guide ✅
+- `EMAIL_IMPLEMENTATION_SUMMARY.md` - Email feature overview ✅
+- `EMAIL_QUICK_START.md` - Quick setup for emails ✅
+- `CLIENT_EMAIL_SYSTEM.md` - Client email notifications ✅
 - `DYNAMIC_DISTANCE_TIME.md` - Distance/time calculation
 
 #### Visual Guides
@@ -944,10 +1162,10 @@ const channel = supabase
 ### Current Limitations
 1. **ETA Calculation**: Route distance/time currently uses OSRM for display only. No traffic or real-time routing integration yet.
 2. **Document Uploads**: Schema supports document_url fields but Supabase Storage integration pending.
-3. **Email Templates**: Notification infrastructure ready but email templates need design.
-4. **Driver UI**: Driver management exists in admin panel but no dedicated driver mobile app yet.
-5. **Payment Integration**: No payment gateway integrated; manual invoicing required.
-6. **Advanced Analytics**: Basic charts working; custom report builder and PDF export pending.
+3. **Driver UI**: Driver management exists in admin panel but no dedicated driver mobile app yet.
+4. **Payment Integration**: No payment gateway integrated; manual invoicing required.
+5. **Advanced Analytics**: Basic charts working; custom report builder and PDF export pending.
+6. **SMS Notifications**: Email system complete, but SMS integration pending (Twilio/AWS SNS).
 
 ### Known Bugs
 - None critical at this time
@@ -1015,6 +1233,15 @@ const channel = supabase
 - [ ] Live map marker movement
 - [ ] Chat messages appear instantly
 - [ ] Notification badges update
+
+### Email Notifications
+- [ ] Driver receives trip assignment email
+- [ ] Client receives booking approval email
+- [ ] Client receives trip started email
+- [ ] Client receives trip completed email
+- [ ] Emails display correctly in inbox
+- [ ] Email links work correctly
+- [ ] Email formatting responsive on mobile
 
 ### UI/UX
 - [ ] Toggle dark/light mode
