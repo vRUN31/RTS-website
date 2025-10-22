@@ -1,5 +1,6 @@
 "use client";
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import TruckSelectionModal from './TruckSelectionModal.client';
 import FleetManagementClient from './FleetManagement.client';
 
@@ -25,6 +26,7 @@ type FleetManagementWithSelectionProps = {
 export default function FleetManagementWithSelection({ trucks }: FleetManagementWithSelectionProps) {
   const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
   const [showModal, setShowModal] = useState(true);
+  const router = useRouter();
 
   const handleSelectTruck = (truck: Truck) => {
     setSelectedTruck(truck);
@@ -36,12 +38,56 @@ export default function FleetManagementWithSelection({ trucks }: FleetManagement
     setSelectedTruck(null);
   };
 
+  const handleAdvancedStatus = () => {
+    router.push('/admin/fleet/status');
+  };
+
   if (showModal) {
     return (
-      <TruckSelectionModal
-        trucks={trucks}
-        onSelectTruck={handleSelectTruck}
-      />
+      <div>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          padding: '1rem 2rem',
+          background: 'white',
+          borderBottom: '2px solid #e5e7eb'
+        }}>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#1f2937' }}>Fleet Management</h1>
+          <button
+            onClick={handleAdvancedStatus}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #ff4d00 0%, #ff7033 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(255, 77, 0, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 77, 0, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(255, 77, 0, 0.3)';
+            }}
+          >
+            🚛 Advanced Truck Status
+          </button>
+        </div>
+        <TruckSelectionModal
+          trucks={trucks}
+          onSelectTruck={handleSelectTruck}
+        />
+      </div>
     );
   }
 

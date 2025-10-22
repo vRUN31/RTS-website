@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import type MapBookingViewComponent from './MapBookingView';
 import { calculatePrice, formatPrice, type PriceBreakdown } from '@/src/utils/pricing';
+import VehicleRecommendation from './VehicleRecommendation.client';
 
 // Dynamically import the map component (client-only)
 const MapBookingView = dynamic<React.ComponentProps<typeof MapBookingViewComponent>>(
@@ -274,20 +275,47 @@ export default function EnhancedBookingForm({
           />
         </div>
 
-        <select 
-          className="filter-input" 
-          aria-label="Vehicle Type" 
-          value={form.vehicle_type} 
-          onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })} 
-          required
-        >
-          <option value="">Select Vehicle Type</option>
-          <option value="Pickup (1.5T)">Pickup (1.5T)</option>
-          <option value="LCV (3.5T)">LCV (3.5T)</option>
-          <option value="Truck (9T)">Truck (9T)</option>
-          <option value="Truck (16T)">Truck (16T)</option>
-          <option value="Trailer (25T)">Trailer (25T)</option>
-        </select>
+        {/* Vehicle Recommendation System */}
+        <VehicleRecommendation 
+          weight={parseFloat(form.weight_mt) || 0}
+          sourceCity={form.source_city}
+          destCity={form.destination_city}
+          material={form.material}
+          onVehicleSelect={(vehicleType) => setForm({ ...form, vehicle_type: vehicleType })}
+          selectedVehicle={form.vehicle_type}
+        />
+
+        {/* Manual override dropdown (shown after selection or for manual input) */}
+        {form.vehicle_type && (
+          <details style={{ marginTop: '8px' }}>
+            <summary style={{
+              padding: '10px',
+              background: '#f5f5f5',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              color: '#616161',
+              fontWeight: 600
+            }}>
+              🔧 Manual Override / Change Vehicle
+            </summary>
+            <select 
+              className="filter-input" 
+              aria-label="Vehicle Type" 
+              value={form.vehicle_type} 
+              onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })} 
+              required
+              style={{ marginTop: '8px' }}
+            >
+              <option value="">Select Vehicle Type</option>
+              <option value="Pickup (1.5T)">Pickup (1.5T)</option>
+              <option value="LCV (3.5T)">LCV (3.5T)</option>
+              <option value="Truck (9T)">Truck (9T)</option>
+              <option value="Truck (16T)">Truck (16T)</option>
+              <option value="Trailer (25T)">Trailer (25T)</option>
+            </select>
+          </details>
+        )}
 
         {/* Price Estimation Display */}
         {priceEstimate && (

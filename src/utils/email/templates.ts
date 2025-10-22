@@ -8,9 +8,11 @@ export interface TripAssignmentEmailData {
   bookingId: string;
   sourceCity: string;
   destinationCity: string;
-  distance: number;
-  estimatedTime: string;
+  distance?: number; // in kilometers (optional, from estimated_distance)
+  estimatedTime?: string; // formatted duration string (optional)
+  estimatedDuration?: number; // in seconds (for calculation)
   pickupDate: string;
+  estimatedArrival?: string; // ISO date string from ETA
   material?: string;
   weight?: number;
   vehicleType: string;
@@ -22,6 +24,37 @@ export interface TripAssignmentEmailData {
  * Generate professional HTML email for driver trip assignment
  */
 export function generateTripAssignmentEmail(data: TripAssignmentEmailData): string {
+  // Format duration from seconds to readable format
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    
+    return parts.join(' ') || '< 1m';
+  };
+
+  // Use provided estimatedTime or calculate from estimatedDuration
+  const estimatedTime = data.estimatedTime || formatDuration(data.estimatedDuration);
+
+  // Format estimated arrival
+  const formattedArrival = data.estimatedArrival
+    ? new Date(data.estimatedArrival).toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    : null;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -319,19 +352,19 @@ export function generateTripAssignmentEmail(data: TripAssignmentEmailData): stri
           <div class="info-grid">
             <div class="info-item">
               <div class="info-label">📏 Distance</div>
-              <div class="info-value">${data.distance} km</div>
+              <div class="info-value">${data.distance ? `${data.distance} km` : 'TBD'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">⏱️ Est. Time</div>
-              <div class="info-value">${data.estimatedTime}</div>
+              <div class="info-value">${estimatedTime || 'TBD'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">📅 Pickup Date</div>
               <div class="info-value">${data.pickupDate}</div>
             </div>
             <div class="info-item">
-              <div class="info-label">🚚 Vehicle</div>
-              <div class="info-value">${data.vehicleType}</div>
+              <div class="info-label">${formattedArrival ? '🎯 Est. Arrival' : '🚚 Vehicle'}</div>
+              <div class="info-value">${formattedArrival || data.vehicleType}</div>
             </div>
           </div>
         </div>
@@ -473,9 +506,10 @@ export interface ClientBookingApprovedEmailData {
   bookingId: string;
   sourceCity: string;
   destinationCity: string;
-  distance: number;
-  estimatedTime: string;
-  estimatedArrival: string;
+  distance?: number; // optional, in km
+  estimatedTime?: string; // formatted string
+  estimatedDuration?: number; // in seconds (for calculation)
+  estimatedArrival?: string; // ISO date string
   pickupDate: string;
   material?: string;
   weight?: number;
@@ -492,9 +526,10 @@ export interface ClientTripStartedEmailData {
   bookingId: string;
   sourceCity: string;
   destinationCity: string;
-  distance: number;
-  estimatedTime: string;
-  estimatedArrival: string;
+  distance?: number; // optional, in km
+  estimatedTime?: string; // formatted string
+  estimatedDuration?: number; // in seconds (for calculation)
+  estimatedArrival?: string; // ISO date string
   truckPlate: string;
   driverName: string;
   driverPhone?: string;
@@ -521,6 +556,37 @@ export interface ClientTripCompletedEmailData {
  * Generate professional HTML email for booking approval notification to client
  */
 export function generateClientBookingApprovedEmail(data: ClientBookingApprovedEmailData): string {
+  // Format duration from seconds to readable format
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    
+    return parts.join(' ') || '< 1m';
+  };
+
+  // Use provided estimatedTime or calculate from estimatedDuration
+  const estimatedTime = data.estimatedTime || formatDuration(data.estimatedDuration);
+
+  // Format estimated arrival
+  const formattedArrival = data.estimatedArrival
+    ? new Date(data.estimatedArrival).toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    : null;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -814,11 +880,11 @@ export function generateClientBookingApprovedEmail(data: ClientBookingApprovedEm
           <div class="info-grid">
             <div class="info-item">
               <div class="info-label">📏 Distance</div>
-              <div class="info-value">${data.distance} km</div>
+              <div class="info-value">${data.distance ? `${data.distance} km` : 'TBD'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">⏱️ Est. Time</div>
-              <div class="info-value">${data.estimatedTime}</div>
+              <div class="info-value">${estimatedTime || 'TBD'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">📅 Pickup Date</div>
@@ -826,7 +892,7 @@ export function generateClientBookingApprovedEmail(data: ClientBookingApprovedEm
             </div>
             <div class="info-item">
               <div class="info-label">🎯 Est. Arrival</div>
-              <div class="info-value">${data.estimatedArrival}</div>
+              <div class="info-value">${formattedArrival || 'TBD'}</div>
             </div>
           </div>
         </div>
@@ -904,6 +970,37 @@ export function generateClientBookingApprovedEmail(data: ClientBookingApprovedEm
  * Generate professional HTML email for trip started notification to client
  */
 export function generateClientTripStartedEmail(data: ClientTripStartedEmailData): string {
+  // Format duration from seconds to readable format
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    
+    return parts.join(' ') || '< 1m';
+  };
+
+  // Use provided estimatedTime or calculate from estimatedDuration
+  const estimatedTime = data.estimatedTime || formatDuration(data.estimatedDuration);
+
+  // Format estimated arrival
+  const formattedArrival = data.estimatedArrival
+    ? new Date(data.estimatedArrival).toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    : null;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -1201,15 +1298,15 @@ export function generateClientTripStartedEmail(data: ClientTripStartedEmailData)
           <div class="info-grid">
             <div class="info-item">
               <div class="info-label">📏 Total Distance</div>
-              <div class="info-value">${data.distance} km</div>
+              <div class="info-value">${data.distance ? `${data.distance} km` : 'TBD'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">⏱️ Est. Time</div>
-              <div class="info-value">${data.estimatedTime}</div>
+              <div class="info-value">${estimatedTime || 'TBD'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">🎯 Est. Arrival</div>
-              <div class="info-value">${data.estimatedArrival}</div>
+              <div class="info-value">${formattedArrival || 'TBD'}</div>
             </div>
             <div class="info-item">
               <div class="info-label">📦 Status</div>

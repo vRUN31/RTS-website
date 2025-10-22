@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
     const { data: booking, error: bErr } = await supabase
       .from('bookings')
-      .select('id, client_id, source_city, destination_city, weight_mt, vehicle_type, pickup_date, material, user_id, estimated_cost')
+      .select('id, client_id, source_city, destination_city, weight_mt, vehicle_type, pickup_date, material, user_id, estimated_cost, estimated_distance, estimated_duration')
       .eq('id', bookingId)
       .maybeSingle();
     if (bErr || !booking) {
@@ -149,6 +149,9 @@ export async function POST(req: Request) {
               weight_mt: booking.weight_mt,
               material: booking.material,
               pickup_date: booking.pickup_date,
+              estimated_distance: booking.estimated_distance,
+              estimated_duration: booking.estimated_duration,
+              estimated_arrival: eta.toISOString(),
               shipment_id: shipment?.id,
             },
             channel: 'email',

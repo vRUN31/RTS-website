@@ -19,7 +19,9 @@ export interface BookingEmailData {
   customerPhone?: string;
   notes?: string;
   truckPlate?: string;
-  estimatedDistance?: string;
+  estimatedDistance?: number; // in kilometers
+  estimatedDuration?: number; // in seconds
+  estimatedArrival?: string; // ISO date string
 }
 
 /**
@@ -34,6 +36,36 @@ export function generateDriverNotificationEmail(data: BookingEmailData): string 
         day: 'numeric' 
       })
     : 'Not specified';
+
+  // Format estimated arrival date
+  const arrivalDateFormatted = data.estimatedArrival
+    ? new Date(data.estimatedArrival).toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    : null;
+
+  // Format duration from seconds to readable format
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    
+    return parts.join(' ') || '< 1m';
+  };
+
+  const durationFormatted = formatDuration(data.estimatedDuration);
 
   return `
 <!DOCTYPE html>
@@ -272,10 +304,20 @@ export function generateDriverNotificationEmail(data: BookingEmailData): string 
             <div class="location-city">${data.destinationCity}</div>
           </div>
         </div>
-        ${data.estimatedDistance ? `
+        ${data.estimatedDistance || data.estimatedDuration ? `
         <div style="text-align: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #a5d6a7;">
-          <span style="color: #2e7d32; font-weight: 600;">Estimated Distance:</span>
-          <span style="color: #1b5e20; font-weight: 700; font-size: 18px; margin-left: 10px;">${data.estimatedDistance}</span>
+          ${data.estimatedDistance ? `
+          <div style="margin-bottom: 8px;">
+            <span style="color: #2e7d32; font-weight: 600;">📏 Distance:</span>
+            <span style="color: #1b5e20; font-weight: 700; font-size: 18px; margin-left: 10px;">${data.estimatedDistance} km</span>
+          </div>
+          ` : ''}
+          ${data.estimatedDuration ? `
+          <div style="margin-bottom: 8px;">
+            <span style="color: #2e7d32; font-weight: 600;">⏱️ Est. Time:</span>
+            <span style="color: #1b5e20; font-weight: 700; font-size: 18px; margin-left: 10px;">${durationFormatted}</span>
+          </div>
+          ` : ''}
         </div>
         ` : ''}
       </div>
@@ -313,6 +355,12 @@ export function generateDriverNotificationEmail(data: BookingEmailData): string 
           <div class="info-label">Pickup Date:</div>
           <div class="info-value"><strong>${pickupDateFormatted}</strong></div>
         </div>
+        ${arrivalDateFormatted ? `
+        <div class="info-row">
+          <div class="info-label">Est. Arrival:</div>
+          <div class="info-value"><strong>${arrivalDateFormatted}</strong></div>
+        </div>
+        ` : ''}
       </div>
 
       <!-- Customer Information -->
@@ -430,6 +478,32 @@ export function generateDriverNotificationText(data: BookingEmailData): string {
     ? new Date(data.pickupDate).toLocaleDateString('en-IN')
     : 'Not specified';
 
+  const arrivalDateFormatted = data.estimatedArrival
+    ? new Date(data.estimatedArrival).toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    : null;
+
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    
+    return parts.join(' ') || '< 1m';
+  };
+
   return `
 🚛 NEW TRIP ASSIGNMENT
 ========================
@@ -442,7 +516,8 @@ You have been assigned a new delivery trip!
 ----------------
 From: ${data.sourceCity}
 To: ${data.destinationCity}
-${data.estimatedDistance ? `Distance: ${data.estimatedDistance}` : ''}
+${data.estimatedDistance ? `Distance: ${data.estimatedDistance} km` : ''}
+${data.estimatedDuration ? `Est. Time: ${formatDuration(data.estimatedDuration)}` : ''}
 
 📦 SHIPMENT INFORMATION
 -----------------------
@@ -452,6 +527,7 @@ ${data.truckPlate ? `Assigned Truck: ${data.truckPlate}` : ''}
 ${data.material ? `Material: ${data.material}` : ''}
 ${data.weightMt ? `Weight: ${data.weightMt} MT` : ''}
 Pickup Date: ${pickupDateFormatted}
+${arrivalDateFormatted ? `Est. Arrival: ${arrivalDateFormatted}` : ''}
 
 ${data.customerName || data.customerPhone ? `
 👤 CUSTOMER CONTACT

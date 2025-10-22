@@ -95,7 +95,7 @@ export async function POST(req: Request) {
 
 		const { data: booking, error: bErr } = await supabase
 			.from('bookings')
-			.select('id, client_id, source_city, destination_city, weight_mt, vehicle_type, pickup_date, material, user_id, estimated_cost, status')
+			.select('id, client_id, source_city, destination_city, weight_mt, vehicle_type, pickup_date, material, user_id, estimated_cost, status, estimated_distance, estimated_duration, notes')
 			.eq('id', bookingId)
 			.maybeSingle();
 			
@@ -233,7 +233,7 @@ export async function POST(req: Request) {
 		if (driverEmail) {
 			console.log('[approve api] Sending email notification to driver...');
 			try {
-				// Use the same trip analysis logic as TripConfirmationModal for accuracy
+				// Use actual booking data if available, otherwise fallback
 				const distance = booking.estimated_distance || 500; // fallback to 500km if not set
 				const pickupDate = booking.pickup_date ? new Date(booking.pickup_date) : undefined;
 				
@@ -245,7 +245,7 @@ export async function POST(req: Request) {
 					? `${tripAnalysis.time.totalDays} day${tripAnalysis.time.totalDays > 1 ? 's' : ''} (${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m)`
 					: `${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m`;
 
-				console.log(`[approve api] Calculated trip details: Distance=${tripAnalysis.distance}km, Time=${estimatedTime}`);
+				console.log(`[approve api] Trip details: Distance=${distance}km (from booking), Time=${estimatedTime}, Duration=${booking.estimated_duration}s`);
 
 				const emailResult = await sendDriverAssignmentEmail(driverEmail, {
 					driverName,
@@ -253,8 +253,10 @@ export async function POST(req: Request) {
 					bookingId,
 					sourceCity: booking.source_city,
 					destinationCity: booking.destination_city,
-					distance: tripAnalysis.distance, // Use calculated distance
+					distance: distance, // Use actual distance from booking
 					estimatedTime, // Use calculated time
+					estimatedDuration: booking.estimated_duration, // Pass duration in seconds for template formatting
+					estimatedArrival: eta.toISOString(), // Pass ETA as ISO string
 					pickupDate: booking.pickup_date 
 						? new Date(booking.pickup_date).toLocaleDateString('en-IN', { 
 							day: 'numeric', 
@@ -317,7 +319,7 @@ export async function POST(req: Request) {
 			if (clientProfile?.email) {
 				console.log('[approve api] Preparing client email data...');
 				
-				// Use the same trip analysis logic for accuracy
+				// Use actual booking data
 				const distance = booking.estimated_distance || 500;
 				const pickupDate = booking.pickup_date ? new Date(booking.pickup_date) : undefined;
 				const tripAnalysis = analyzeTripDetails(distance, booking.vehicle_type || 'Truck (9T)', pickupDate);
@@ -328,7 +330,7 @@ export async function POST(req: Request) {
 				}
 				
 				console.log('[approve api] Trip analysis:', {
-					distance: tripAnalysis.distance,
+					distance: distance,
 					time: `${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m`,
 					days: tripAnalysis.time.totalDays
 				});
@@ -338,28 +340,15 @@ export async function POST(req: Request) {
 					? `${tripAnalysis.time.totalDays} day${tripAnalysis.time.totalDays > 1 ? 's' : ''} (${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m)`
 					: `${tripAnalysis.time.drivingHours}h ${tripAnalysis.time.drivingMinutes}m`;
 
-				// Calculate estimated arrival date
-				const totalMinutes = (tripAnalysis.time.drivingHours * 60) + tripAnalysis.time.drivingMinutes;
-				const estimatedArrivalDate = pickupDate 
-					? new Date(pickupDate.getTime() + (totalMinutes * 60000))
-					: new Date(Date.now() + (totalMinutes * 60000));
-				
-				const estimatedArrival = estimatedArrivalDate.toLocaleDateString('en-IN', { 
-					day: 'numeric', 
-					month: 'short', 
-					year: 'numeric',
-					hour: '2-digit',
-					minute: '2-digit'
-				});
-
 				const clientEmailResult = await sendClientBookingApprovedEmail(clientProfile.email, {
 					customerName: clientProfile.name || 'Valued Customer',
 					bookingId,
 					sourceCity: booking.source_city,
 					destinationCity: booking.destination_city,
-					distance: tripAnalysis.distance,
+					distance: distance, // Use actual distance from booking
 					estimatedTime,
-					estimatedArrival,
+					estimatedDuration: booking.estimated_duration, // Pass duration in seconds for template formatting
+					estimatedArrival: eta.toISOString(), // Pass ETA as ISO string
 					pickupDate: booking.pickup_date 
 						? new Date(booking.pickup_date).toLocaleDateString('en-IN', { 
 							day: 'numeric', 

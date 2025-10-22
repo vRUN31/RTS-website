@@ -7,6 +7,7 @@ import LeafletMap from '@/src/components/map/LeafletMap.client';
 import BookingActionRow from '@/src/components/admin/BookingActionRow.client';
 import OpenAssignTruckModalListener from '@/src/components/admin/OpenAssignTruckModalListener.client';
 import RecentShipmentsTable from '@/src/components/admin/RecentShipmentsTable.client';
+import TruckStatusSummary from '@/src/components/admin/TruckStatusSummary.client';
 import AdminShell from './_admin-shell.client';
 import AdminDashboardLinks from './_dashboard-links.client';
 
@@ -281,6 +282,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             <div className="mt-16">
                 <LeafletMap mode="admin" height={420} />
             </div>
+
+            {/* Truck Status Summary Widget */}
+            <section className="mt-16">
+                <TruckStatusSummary />
+            </section>
 
             {/* Link to analytics page, Fleet Management, and Support Chat */}
             <AdminDashboardLinks userId={user.id} />

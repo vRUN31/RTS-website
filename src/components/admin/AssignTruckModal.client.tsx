@@ -8,6 +8,7 @@ type TruckRow = {
   id: string;
   plate: string | null;
   status: string | null;
+  vehicle_type: string | null;
   last_updated: string | null;
   driver_id: string | null;
   driver?: {
@@ -65,10 +66,12 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
       
       if (mounted && bookingData) setBooking(bookingData);
       
-      // Fetch trucks and drivers separately to avoid RLS joins
+      // Fetch trucks filtered by vehicle_type matching the booking
+      // Only show trucks that match the vehicle type selected by the client
       const { data: trucksList } = await supabase
         .from('trucks')
-        .select('id, plate, status, last_updated, driver_id')
+        .select('id, plate, status, last_updated, driver_id, vehicle_type')
+        .eq('vehicle_type', bookingData?.vehicle_type) // Filter by matching vehicle type
         .limit(500);
       const driverIds = Array.from(new Set((trucksList ?? []).map(t => t.driver_id).filter(Boolean))) as string[];
       let driverMap: Record<string, TruckRow['driver']> = {};
@@ -195,6 +198,33 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
           <div className="modal-body">
             {error && <div className="error-banner">{error}</div>}
             
+            {/* Vehicle Type Filter Info */}
+            {booking?.vehicle_type && (
+              <div style={{ 
+                padding: '12px 16px', 
+                background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', 
+                border: '2px solid #2196f3',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <div style={{ fontSize: '32px' }}>🚚</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#0d47a1', marginBottom: '4px' }}>
+                    Filtered by Vehicle Type
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#1565c0' }}>
+                    {booking.vehicle_type}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#1976d2', marginTop: '4px' }}>
+                    Only showing trucks matching the client's selected vehicle category
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Summary Stats */}
             <div style={{ 
               display: 'flex', 
@@ -246,7 +276,19 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
                         disabled={showConfirmation}
                       />
                       <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
-                      <div className="list-col plate">{t.plate ?? '—'}</div>
+                      <div className="list-col plate">
+                        {t.plate ?? '—'}
+                        {t.vehicle_type && (
+                          <div style={{ 
+                            fontSize: '10px', 
+                            color: '#2196f3', 
+                            marginTop: '2px',
+                            fontWeight: 600 
+                          }}>
+                            {t.vehicle_type}
+                          </div>
+                        )}
+                      </div>
                       <div className="list-col status">{t.status ?? '—'}</div>
                       <div className="list-col driver">
                         {t.driver ? (
@@ -301,7 +343,19 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
                         style={{ cursor: 'not-allowed' }}
                       />
                       <div className="list-col id">{String((t as any).display_code ?? t.id).slice(0,8)}…</div>
-                      <div className="list-col plate">{t.plate ?? '—'}</div>
+                      <div className="list-col plate">
+                        {t.plate ?? '—'}
+                        {t.vehicle_type && (
+                          <div style={{ 
+                            fontSize: '10px', 
+                            color: '#2196f3', 
+                            marginTop: '2px',
+                            fontWeight: 600 
+                          }}>
+                            {t.vehicle_type}
+                          </div>
+                        )}
+                      </div>
                       <div className="list-col status">
                         <span style={{ color: '#dc3545', fontWeight: 600 }}>🚛 In Transit</span>
                       </div>
@@ -336,7 +390,15 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
               {trucks.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
                   <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚛</div>
-                  <div>No trucks found in the system</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600, color: '#333', marginBottom: '8px' }}>
+                    No trucks found for {booking?.vehicle_type || 'this vehicle type'}
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#666' }}>
+                    The client selected <strong>{booking?.vehicle_type}</strong> but no trucks of this type exist in the system.
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#999', marginTop: '8px' }}>
+                    Please add trucks of this vehicle type in the fleet management section.
+                  </div>
                 </div>
               )}
 
@@ -351,10 +413,10 @@ export default function AssignTruckModal({ bookingId, onClose, onAssigned }: {
                 }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>⚠️</div>
                   <div style={{ fontWeight: 600, color: '#856404', marginBottom: '4px' }}>
-                    All trucks are currently on active trips
+                    All {booking?.vehicle_type} trucks are currently on active trips
                   </div>
                   <div style={{ fontSize: '13px', color: '#856404' }}>
-                    Please wait for a truck to complete its delivery before assigning a new booking
+                    Please wait for a {booking?.vehicle_type} truck to complete its delivery before assigning this booking
                   </div>
                 </div>
               )}

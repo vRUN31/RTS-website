@@ -42,6 +42,11 @@ export async function POST(request: Request) {
             email,
             phone
           )
+        ),
+        clients:client_id (
+          id,
+          name,
+          phone
         )
       `)
       .eq('id', bookingId)
@@ -72,6 +77,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // Fetch the related shipment to get ETA
+    const { data: shipment } = await supabase
+      .from('shipments')
+      .select('eta')
+      .eq('client_id', booking.client_id)
+      .eq('origin', booking.source_city)
+      .eq('destination', booking.destination_city)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     // Prepare email data
     const emailData: BookingEmailData = {
       bookingId: booking.id,
@@ -85,7 +101,11 @@ export async function POST(request: Request) {
       pickupDate: booking.pickup_date,
       notes: booking.notes,
       truckPlate: booking.trucks.plate || booking.trucks.display_code,
-      customerPhone: driver.phone, // Can fetch from user profile if needed
+      customerName: booking.clients?.name,
+      customerPhone: booking.clients?.phone,
+      estimatedDistance: booking.estimated_distance,
+      estimatedDuration: booking.estimated_duration,
+      estimatedArrival: shipment?.eta,
     };
 
     // Generate email HTML
