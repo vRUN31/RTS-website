@@ -10,6 +10,7 @@ import RecentShipmentsTable from '@/src/components/admin/RecentShipmentsTable.cl
 import TruckStatusSummary from '@/src/components/admin/TruckStatusSummary.client';
 import AdminShell from './_admin-shell.client';
 import AdminDashboardLinks from './_dashboard-links.client';
+import BackButton from '@/src/components/_back-button.client';
 
 export default async function AdminDashboard({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
     // SSR guard: only admins may access
@@ -214,6 +215,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     return (
         <AdminShell>
             <main className="dashboard-container">
+                <div className="page-header-back">
+                    <BackButton label="Back to Home" fallbackUrl="/" />
+                </div>
+
                 <div className="row-center my-32">
                     <h1 className="admin-welcome">
                         Welcome back, Admin!!

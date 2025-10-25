@@ -6,6 +6,8 @@ import NotificationSettings from './_notification-settings.client';
 import AppearanceSettings from './_appearance-settings.client';
 import AdminPricingSettings from './_admin-pricing-settings.client';
 import HelpSupport from './_help-support.client';
+import BackButton from '@/src/components/_back-button.client';
+import './settings.css';
 
 type Section = 'profile' | 'notifications' | 'appearance' | 'pricing' | 'help';
 
@@ -37,6 +39,10 @@ export default function SettingsContent({
 
   return (
     <div className="settings-page">
+      <div className="page-header-back">
+        <BackButton label="Back to Dashboard" fallbackUrl={isAdmin ? '/admin' : '/dashboard/customer'} />
+      </div>
+
       <div className="settings-container">
         {/* Header */}
         <div className="settings-header">

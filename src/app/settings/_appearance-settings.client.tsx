@@ -18,17 +18,32 @@ export default function AppearanceSettings({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Apply theme
-    if (theme === 'dark') {
+    // Apply theme on mount and when it changes
+    applyTheme(theme);
+    
+    // Listen for system theme changes in auto mode
+    if (theme === 'auto') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = () => applyTheme('auto');
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    }
+  }, [theme]);
+
+  function applyTheme(themeValue: string) {
+    if (themeValue === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
-    } else if (theme === 'light') {
+      localStorage.setItem('theme', 'dark');
+    } else if (themeValue === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
     } else {
       // Auto mode
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+      localStorage.setItem('theme', 'auto');
     }
-  }, [theme]);
+  }
 
   useEffect(() => {
     // Apply font size

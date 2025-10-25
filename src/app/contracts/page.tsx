@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import ThemeToggle from '@/src/components/ThemeToggle.client';
+import BackButton from '@/src/components/_back-button.client';
 import './contracts.css';
 
 type Contract = {
@@ -30,6 +31,12 @@ export default function ContractsPage() {
     const [filter, setFilter] = useState<'all' | 'active' | 'expired'>('all');
     const [showCreate, setShowCreate] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+    const [showViewModal, setShowViewModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [updating, setUpdating] = useState(false);
     const [newContract, setNewContract] = useState({
         client_name: '',
         client_company: '',
@@ -234,10 +241,153 @@ export default function ContractsPage() {
         return client?.name || `ID: ${clientId.slice(0, 8)}...`;
     }
 
+    // View contract handler
+    function handleViewContract(contract: Contract) {
+        setSelectedContract(contract);
+        setShowViewModal(true);
+    }
+
+    // Edit contract handler
+    function handleEditContract(contract: Contract) {
+        setSelectedContract(contract);
+        // Pre-fill form with existing data
+        const lanes = contract.lanes || {};
+        const base_rates = contract.base_rates || {};
+        const documents = contract.documents || {};
+        
+        setNewContract({
+            client_name: getClientName(contract.client_id),
+            client_company: '',
+            client_email: '',
+            client_phone: '',
+            start_at: contract.start_at,
+            end_at: contract.end_at,
+            description: documents.description || '',
+            contract_type: lanes.contract_type || '',
+            payment_terms: base_rates.payment_terms || '',
+            billing_cycle: base_rates.billing_cycle || '',
+            rate_per_km: base_rates.rate_per_km ? String(base_rates.rate_per_km) : '',
+            value: base_rates.value ? String(base_rates.value) : '',
+            routes: lanes.routes || '',
+            vehicle_types: lanes.vehicle_types || '',
+            frequency: lanes.frequency || '',
+            additional_services: lanes.additional_services || '',
+            penalty_clause: documents.penalty_clause || '',
+            renewal_terms: documents.renewal_terms || '',
+        });
+        setShowEditModal(true);
+    }
+
+    // Delete contract handler
+    function handleDeleteContract(contract: Contract) {
+        setSelectedContract(contract);
+        setShowDeleteModal(true);
+    }
+
+    // Confirm delete
+    async function confirmDelete() {
+        if (!selectedContract) return;
+        
+        setDeleting(true);
+        setError(null);
+        
+        try {
+            if (!supabaseUrl || !supabaseAnonKey) throw new Error('Configure Supabase');
+            const supabase = createClient();
+            
+            const { error: deleteError } = await supabase
+                .from('contracts')
+                .delete()
+                .eq('id', selectedContract.id);
+            
+            if (deleteError) throw deleteError;
+            
+            setSuccess(`✅ Contract deleted successfully!`);
+            setShowDeleteModal(false);
+            setSelectedContract(null);
+            
+            // Reload contracts
+            const { data } = await supabase
+                .from('contracts')
+                .select('*')
+                .order('start_at', { ascending: false });
+            setRows(data as Contract[]);
+            
+            setTimeout(() => setSuccess(null), 5000);
+        } catch (e: any) {
+            setError(e?.message ?? 'Failed to delete contract');
+        } finally {
+            setDeleting(false);
+        }
+    }
+
+    // Update contract
+    async function handleUpdateContract(e: React.FormEvent) {
+        e.preventDefault();
+        if (!selectedContract) return;
+        
+        setUpdating(true);
+        setError(null);
+        
+        try {
+            if (!supabaseUrl || !supabaseAnonKey) throw new Error('Configure Supabase');
+            const supabase = createClient();
+            
+            const { error: updateError } = await supabase
+                .from('contracts')
+                .update({
+                    start_at: newContract.start_at,
+                    end_at: newContract.end_at,
+                    lanes: {
+                        contract_type: newContract.contract_type,
+                        routes: newContract.routes,
+                        vehicle_types: newContract.vehicle_types,
+                        frequency: newContract.frequency,
+                        additional_services: newContract.additional_services,
+                    },
+                    base_rates: {
+                        value: newContract.value ? parseFloat(newContract.value) : null,
+                        rate_per_km: newContract.rate_per_km ? parseFloat(newContract.rate_per_km) : null,
+                        payment_terms: newContract.payment_terms,
+                        billing_cycle: newContract.billing_cycle,
+                    },
+                    documents: {
+                        description: newContract.description,
+                        penalty_clause: newContract.penalty_clause,
+                        renewal_terms: newContract.renewal_terms,
+                    }
+                })
+                .eq('id', selectedContract.id);
+            
+            if (updateError) throw updateError;
+            
+            setSuccess(`✅ Contract updated successfully!`);
+            setShowEditModal(false);
+            setSelectedContract(null);
+            
+            // Reload contracts
+            const { data } = await supabase
+                .from('contracts')
+                .select('*')
+                .order('start_at', { ascending: false });
+            setRows(data as Contract[]);
+            
+            setTimeout(() => setSuccess(null), 5000);
+        } catch (e: any) {
+            setError(e?.message ?? 'Failed to update contract');
+        } finally {
+            setUpdating(false);
+        }
+    }
+
         return (
             <>
                 <ThemeToggle />
                 <main className="contracts-container">
+                    <div className="page-header-back">
+                        <BackButton label="Back to Dashboard" fallbackUrl={role === 'admin' ? '/admin' : '/dashboard/customer'} />
+                    </div>
+
                     <div className="contracts-header">
                         <h1>📋 Contracts Management</h1>
                         <p className="contracts-subtitle">Manage and track all your business contracts</p>
@@ -786,15 +936,27 @@ export default function ContractsPage() {
                                                     </td>
                                                     <td>
                                                         <div className="action-buttons">
-                                                            <button className="btn-action btn-view" title="View details">
+                                                            <button 
+                                                                className="btn-action btn-view" 
+                                                                title="View details"
+                                                                onClick={() => handleViewContract(contract)}
+                                                            >
                                                                 👁️ View
                                                             </button>
                                                             {role === 'admin' && (
                                                                 <>
-                                                                    <button className="btn-action btn-edit" title="Edit contract">
+                                                                    <button 
+                                                                        className="btn-action btn-edit" 
+                                                                        title="Edit contract"
+                                                                        onClick={() => handleEditContract(contract)}
+                                                                    >
                                                                         ✏️ Edit
                                                                     </button>
-                                                                    <button className="btn-action btn-delete" title="Delete contract">
+                                                                    <button 
+                                                                        className="btn-action btn-delete" 
+                                                                        title="Delete contract"
+                                                                        onClick={() => handleDeleteContract(contract)}
+                                                                    >
                                                                         🗑️ Delete
                                                                     </button>
                                                                 </>
@@ -810,6 +972,424 @@ export default function ContractsPage() {
                         </div>
                     )}
         </main>
+
+        {/* View Contract Modal */}
+        {showViewModal && selectedContract && (
+            <div className="modal-overlay" onClick={() => setShowViewModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <button 
+                            className="back-button back-button-minimal modal-back-btn"
+                            onClick={() => setShowViewModal(false)}
+                            aria-label="Close modal"
+                        >
+                            <span className="back-button-icon">←</span>
+                            <span className="back-button-text">Close</span>
+                        </button>
+                        <h3>📋 Contract Details</h3>
+                        <button className="modal-close" onClick={() => setShowViewModal(false)}>✖</button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="detail-section">
+                            <h4>👥 Client Information</h4>
+                            <div className="detail-grid">
+                                <div className="detail-item">
+                                    <label>Client Name:</label>
+                                    <span>{getClientName(selectedContract.client_id)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="detail-section">
+                            <h4>📅 Contract Period</h4>
+                            <div className="detail-grid">
+                                <div className="detail-item">
+                                    <label>Start Date:</label>
+                                    <span>{new Date(selectedContract.start_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <label>End Date:</label>
+                                    <span>{new Date(selectedContract.end_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <label>Status:</label>
+                                    <span className={`status-badge status-${getContractStatus(selectedContract)}`}>
+                                        {getContractStatus(selectedContract)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {selectedContract.lanes && (
+                            <div className="detail-section">
+                                <h4>📋 Contract Details</h4>
+                                <div className="detail-grid">
+                                    {selectedContract.lanes.contract_type && (
+                                        <div className="detail-item">
+                                            <label>Contract Type:</label>
+                                            <span>{selectedContract.lanes.contract_type}</span>
+                                        </div>
+                                    )}
+                                    {selectedContract.lanes.routes && (
+                                        <div className="detail-item">
+                                            <label>Routes:</label>
+                                            <span>{selectedContract.lanes.routes}</span>
+                                        </div>
+                                    )}
+                                    {selectedContract.lanes.vehicle_types && (
+                                        <div className="detail-item">
+                                            <label>Vehicle Types:</label>
+                                            <span>{selectedContract.lanes.vehicle_types}</span>
+                                        </div>
+                                    )}
+                                    {selectedContract.lanes.frequency && (
+                                        <div className="detail-item">
+                                            <label>Frequency:</label>
+                                            <span>{selectedContract.lanes.frequency}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedContract.base_rates && (
+                            <div className="detail-section">
+                                <h4>💰 Financial Terms</h4>
+                                <div className="detail-grid">
+                                    {selectedContract.base_rates.value && (
+                                        <div className="detail-item">
+                                            <label>Contract Value:</label>
+                                            <span>₹{selectedContract.base_rates.value.toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+                                    {selectedContract.base_rates.rate_per_km && (
+                                        <div className="detail-item">
+                                            <label>Rate per KM:</label>
+                                            <span>₹{selectedContract.base_rates.rate_per_km}</span>
+                                        </div>
+                                    )}
+                                    {selectedContract.base_rates.payment_terms && (
+                                        <div className="detail-item">
+                                            <label>Payment Terms:</label>
+                                            <span>{selectedContract.base_rates.payment_terms}</span>
+                                        </div>
+                                    )}
+                                    {selectedContract.base_rates.billing_cycle && (
+                                        <div className="detail-item">
+                                            <label>Billing Cycle:</label>
+                                            <span>{selectedContract.base_rates.billing_cycle}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedContract.documents && (
+                            <div className="detail-section">
+                                <h4>📄 Additional Information</h4>
+                                {selectedContract.documents.description && (
+                                    <div className="detail-item-full">
+                                        <label>Description:</label>
+                                        <p>{selectedContract.documents.description}</p>
+                                    </div>
+                                )}
+                                {selectedContract.documents.penalty_clause && (
+                                    <div className="detail-item-full">
+                                        <label>Penalty Clause:</label>
+                                        <p>{selectedContract.documents.penalty_clause}</p>
+                                    </div>
+                                )}
+                                {selectedContract.documents.renewal_terms && (
+                                    <div className="detail-item-full">
+                                        <label>Renewal Terms:</label>
+                                        <p>{selectedContract.documents.renewal_terms}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    <div className="modal-footer">
+                        <button className="btn-cancel" onClick={() => setShowViewModal(false)}>Close</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Edit Contract Modal */}
+        {showEditModal && selectedContract && (
+            <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+                <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <button 
+                            className="back-button back-button-minimal modal-back-btn"
+                            onClick={() => setShowEditModal(false)}
+                            aria-label="Close modal"
+                        >
+                            <span className="back-button-icon">←</span>
+                            <span className="back-button-text">Close</span>
+                        </button>
+                        <h3>✏️ Edit Contract</h3>
+                        <button className="modal-close" onClick={() => setShowEditModal(false)}>✖</button>
+                    </div>
+                    <form onSubmit={handleUpdateContract} className="modal-body">
+                        <div className="form-section">
+                            <h4 className="section-title">📅 Contract Period</h4>
+                            <div className="form-grid">
+                                <div className="form-field">
+                                    <label htmlFor="edit_start_date">Start Date <span className="required">*</span></label>
+                                    <input
+                                        id="edit_start_date"
+                                        type="date"
+                                        className="form-input"
+                                        value={newContract.start_at}
+                                        onChange={(e) => setNewContract({ ...newContract, start_at: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="form-field">
+                                    <label htmlFor="edit_end_date">End Date <span className="required">*</span></label>
+                                    <input
+                                        id="edit_end_date"
+                                        type="date"
+                                        className="form-input"
+                                        value={newContract.end_at}
+                                        onChange={(e) => setNewContract({ ...newContract, end_at: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <h4 className="section-title">📋 Contract Details</h4>
+                            <div className="form-grid">
+                                <div className="form-field">
+                                    <label htmlFor="edit_contract_type">Contract Type</label>
+                                    <select
+                                        id="edit_contract_type"
+                                        className="form-select"
+                                        value={newContract.contract_type}
+                                        onChange={(e) => setNewContract({ ...newContract, contract_type: e.target.value })}
+                                    >
+                                        <option value="">Select type</option>
+                                        <option value="Fixed Term">Fixed Term</option>
+                                        <option value="Ongoing">Ongoing</option>
+                                        <option value="Project-Based">Project-Based</option>
+                                        <option value="Seasonal">Seasonal</option>
+                                        <option value="Dedicated Fleet">Dedicated Fleet</option>
+                                    </select>
+                                </div>
+                                <div className="form-field">
+                                    <label htmlFor="edit_frequency">Frequency</label>
+                                    <select
+                                        id="edit_frequency"
+                                        className="form-select"
+                                        value={newContract.frequency}
+                                        onChange={(e) => setNewContract({ ...newContract, frequency: e.target.value })}
+                                    >
+                                        <option value="">Select frequency</option>
+                                        <option value="Daily">Daily</option>
+                                        <option value="Weekly">Weekly</option>
+                                        <option value="Bi-Weekly">Bi-Weekly</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="On-Demand">On-Demand</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <h4 className="section-title">💰 Financial Terms</h4>
+                            <div className="form-grid">
+                                <div className="form-field">
+                                    <label htmlFor="edit_value">Contract Value (₹)</label>
+                                    <input
+                                        id="edit_value"
+                                        type="number"
+                                        className="form-input"
+                                        value={newContract.value}
+                                        onChange={(e) => setNewContract({ ...newContract, value: e.target.value })}
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                                <div className="form-field">
+                                    <label htmlFor="edit_rate_per_km">Rate per KM (₹)</label>
+                                    <input
+                                        id="edit_rate_per_km"
+                                        type="number"
+                                        className="form-input"
+                                        value={newContract.rate_per_km}
+                                        onChange={(e) => setNewContract({ ...newContract, rate_per_km: e.target.value })}
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                                <div className="form-field">
+                                    <label htmlFor="edit_payment_terms">Payment Terms</label>
+                                    <select
+                                        id="edit_payment_terms"
+                                        className="form-select"
+                                        value={newContract.payment_terms}
+                                        onChange={(e) => setNewContract({ ...newContract, payment_terms: e.target.value })}
+                                    >
+                                        <option value="">Select terms</option>
+                                        <option value="Net 15">Net 15 Days</option>
+                                        <option value="Net 30">Net 30 Days</option>
+                                        <option value="Net 45">Net 45 Days</option>
+                                        <option value="Net 60">Net 60 Days</option>
+                                        <option value="Advance">Advance Payment</option>
+                                        <option value="50% Advance">50% Advance, 50% On Completion</option>
+                                    </select>
+                                </div>
+                                <div className="form-field">
+                                    <label htmlFor="edit_billing_cycle">Billing Cycle</label>
+                                    <select
+                                        id="edit_billing_cycle"
+                                        className="form-select"
+                                        value={newContract.billing_cycle}
+                                        onChange={(e) => setNewContract({ ...newContract, billing_cycle: e.target.value })}
+                                    >
+                                        <option value="">Select cycle</option>
+                                        <option value="Weekly">Weekly</option>
+                                        <option value="Bi-Weekly">Bi-Weekly</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Quarterly">Quarterly</option>
+                                        <option value="Per Shipment">Per Shipment</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <h4 className="section-title">🚚 Service Specifications</h4>
+                            <div className="form-field">
+                                <label htmlFor="edit_routes">Routes Covered</label>
+                                <input
+                                    id="edit_routes"
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="e.g., Mumbai-Delhi, Delhi-Bangalore"
+                                    value={newContract.routes}
+                                    onChange={(e) => setNewContract({ ...newContract, routes: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-field">
+                                <label htmlFor="edit_vehicle_types">Vehicle Types</label>
+                                <input
+                                    id="edit_vehicle_types"
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="e.g., Truck (9T), Trailer (25T)"
+                                    value={newContract.vehicle_types}
+                                    onChange={(e) => setNewContract({ ...newContract, vehicle_types: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-field">
+                                <label htmlFor="edit_additional_services">Additional Services</label>
+                                <input
+                                    id="edit_additional_services"
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="e.g., Loading/Unloading, Insurance"
+                                    value={newContract.additional_services}
+                                    onChange={(e) => setNewContract({ ...newContract, additional_services: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <h4 className="section-title">📝 Additional Terms</h4>
+                            <div className="form-field">
+                                <label htmlFor="edit_description">Description</label>
+                                <textarea
+                                    id="edit_description"
+                                    className="form-input"
+                                    rows={3}
+                                    value={newContract.description}
+                                    onChange={(e) => setNewContract({ ...newContract, description: e.target.value })}
+                                    style={{ resize: 'vertical' }}
+                                />
+                            </div>
+                            <div className="form-field">
+                                <label htmlFor="edit_penalty_clause">Penalty Clause</label>
+                                <textarea
+                                    id="edit_penalty_clause"
+                                    className="form-input"
+                                    rows={2}
+                                    value={newContract.penalty_clause}
+                                    onChange={(e) => setNewContract({ ...newContract, penalty_clause: e.target.value })}
+                                    style={{ resize: 'vertical' }}
+                                />
+                            </div>
+                            <div className="form-field">
+                                <label htmlFor="edit_renewal_terms">Renewal Terms</label>
+                                <textarea
+                                    id="edit_renewal_terms"
+                                    className="form-input"
+                                    rows={2}
+                                    value={newContract.renewal_terms}
+                                    onChange={(e) => setNewContract({ ...newContract, renewal_terms: e.target.value })}
+                                    style={{ resize: 'vertical' }}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="modal-footer">
+                            <button type="submit" className="btn-submit" disabled={updating}>
+                                {updating ? '⏳ Updating...' : '💾 Save Changes'}
+                            </button>
+                            <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>
+                                ✖ Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && selectedContract && (
+            <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+                <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <button 
+                            className="back-button back-button-minimal modal-back-btn"
+                            onClick={() => setShowDeleteModal(false)}
+                            aria-label="Close modal"
+                        >
+                            <span className="back-button-icon">←</span>
+                            <span className="back-button-text">Cancel</span>
+                        </button>
+                        <h3>🗑️ Delete Contract</h3>
+                        <button className="modal-close" onClick={() => setShowDeleteModal(false)}>✖</button>
+                    </div>
+                    <div className="modal-body">
+                        <div className="warning-message">
+                            <div className="warning-icon">⚠️</div>
+                            <div className="warning-content">
+                                <h4>Are you sure you want to delete this contract?</h4>
+                                <p><strong>Client:</strong> {getClientName(selectedContract.client_id)}</p>
+                                <p><strong>Period:</strong> {new Date(selectedContract.start_at).toLocaleDateString()} - {new Date(selectedContract.end_at).toLocaleDateString()}</p>
+                                <p className="warning-note">⚠️ This action cannot be undone!</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button 
+                            className="btn-delete-confirm" 
+                            onClick={confirmDelete}
+                            disabled={deleting}
+                        >
+                            {deleting ? '⏳ Deleting...' : '🗑️ Yes, Delete'}
+                        </button>
+                        <button className="btn-cancel" onClick={() => setShowDeleteModal(false)}>
+                            ✖ Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         </>
     );
 }

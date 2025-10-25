@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import ThemeToggle from '@/src/components/ThemeToggle.client';
+import BackButton from '@/src/components/_back-button.client';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
@@ -22,10 +23,9 @@ export default function RegisterPage() {
         <>
             <ThemeToggle />
             <main className="main-centered pos-relative">
-                <Link href="/" className="back-btn no-underline row-align pos-abs back-link">
-                    <span className="back-pill">&larr;</span>
-                    <span className="back-text">Back</span>
-                </Link>
+                <div className="page-header-back" style={{ position: 'absolute', top: '1rem', left: '1rem' }}>
+                    <BackButton label="Back to Home" fallbackUrl="/" />
+                </div>
                 <div className="logo-text">RTS</div>
                 <div className="card card-medium mt-16">
                     <div className="title text-dark mb-18">Sign Up</div>

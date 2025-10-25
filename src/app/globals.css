@@ -1,3 +1,6 @@
+/* Import Back Button Styles */
+@import url('../components/back-button.css');
+
 /* Admin Bookings Panel Styling */
 .admin-bookings-panel {
     background: linear-gradient(120deg, #fff7f0 80%, #f6f6f6 100%);

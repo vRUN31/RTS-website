@@ -2,6 +2,7 @@ import { validateAdmin } from '@/src/utils/admin';
 import './manage-trucks.css';
 import ManageTrucksClient from '@/src/components/admin/ManageTrucks.client';
 import AdminShell from '../_admin-shell.client';
+import BackButton from '@/src/components/_back-button.client';
 
 export default async function AdminManageTrucksPage() {
   try {
@@ -11,6 +12,9 @@ export default async function AdminManageTrucksPage() {
     return (
       <AdminShell>
         <main className="manage-trucks-main">
+          <div className="page-header-back">
+            <BackButton label="Back to Admin Dashboard" fallbackUrl="/admin" />
+          </div>
           <h1>Manage Trucks</h1>
           <ManageTrucksClient />
         </main>

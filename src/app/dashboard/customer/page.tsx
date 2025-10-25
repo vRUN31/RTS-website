@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/client';
 import dynamic from 'next/dynamic';
 import styles from './dashboard.module.css';
 import EnhancedBookingForm from '@/src/components/booking/EnhancedBookingForm';
+import BackButton from '@/src/components/_back-button.client';
 
 const LeafletMap = dynamic(() => import('@/src/components/map/LeafletMap.client'), { ssr: false });
 const TrucksShowcase = dynamic(() => import('@/src/components/guest/TrucksShowcase.client'), { ssr: false });
@@ -440,6 +441,10 @@ export default function CustomerDashboardPage() {
     return (
         <>
             <main className="dashboard-container">
+                <div className="page-header-back">
+                    <BackButton label="Back to Home" fallbackUrl="/" />
+                </div>
+
                 <div className={`dashboard-header mb-18 ${styles.gradientText}`}>Welcome to RAJMOHAN TRANSPORT SERVICES</div>
 
                 {/* KPI Row - Hidden for guest users */}

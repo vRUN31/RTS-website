@@ -1,0 +1,208 @@
+/* ========== BACK BUTTON STYLES ========== */
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--text, #333);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.back-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 77, 0, 0.1);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.back-button:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.back-button:hover {
+  border-color: var(--brand, #ff4d00);
+  transform: translateX(-4px);
+  box-shadow: 0 4px 12px rgba(255, 77, 0, 0.2);
+}
+
+.back-button:active {
+  transform: translateX(-2px);
+}
+
+.back-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.back-button:disabled:hover {
+  border-color: var(--border, #e2e8f0);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .back-button {
+  background: var(--card, #1a2332);
+  color: var(--text, #f8fafc);
+  border-color: var(--border, #2d3748);
+}
+
+[data-theme="dark"] .back-button:hover {
+  border-color: var(--brand, #ff4d00);
+  box-shadow: 0 4px 12px rgba(255, 77, 0, 0.3);
+}
+
+/* Back Button Icon */
+.back-button-icon {
+  font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.back-button:hover .back-button-icon {
+  transform: translateX(-4px);
+}
+
+.back-button-text {
+  position: relative;
+  z-index: 1;
+}
+
+/* ========== BACK BUTTON VARIANTS ========== */
+
+/* Default Variant uses base .back-button styles */
+
+/* Minimal Variant - Less prominent */
+.back-button-minimal {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border, #e2e8f0);
+  background: transparent;
+  font-size: 0.875rem;
+}
+
+.back-button-minimal:hover {
+  background: var(--card, #fff);
+}
+
+[data-theme="dark"] .back-button-minimal:hover {
+  background: var(--card, #1a2332);
+}
+
+/* Icon Only Variant - Just the arrow */
+.back-button-icon {
+  padding: 0.625rem;
+  border-radius: 50%;
+  min-width: 40px;
+  min-height: 40px;
+  justify-content: center;
+}
+
+.back-button-icon .back-button-icon {
+  font-size: 1.5rem;
+}
+
+/* ========== BACK BUTTON POSITIONING ========== */
+
+/* Page Header Back Button */
+.page-header-back {
+  margin-bottom: 1rem;
+}
+
+/* Modal Header Back Button */
+.modal-header-back {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+}
+
+/* Floating Back Button (for pages without header) */
+.floating-back-button {
+  position: fixed;
+  top: 5rem;
+  left: 1rem;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="dark"] .floating-back-button {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+
+@media (max-width: 768px) {
+  .back-button {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .back-button-icon {
+    font-size: 1.125rem;
+  }
+
+  .floating-back-button {
+    top: 4.5rem;
+    left: 0.5rem;
+  }
+
+  /* On mobile, make icon-only variant more compact */
+  .back-button-icon {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .back-button-text {
+    display: none;
+  }
+
+  .back-button {
+    padding: 0.625rem;
+    border-radius: 50%;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .back-button-icon {
+    font-size: 1.25rem;
+  }
+}
+
+/* ========== ANIMATIONS ========== */
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.back-button {
+  animation: slideInFromLeft 0.4s ease-out;
+}
