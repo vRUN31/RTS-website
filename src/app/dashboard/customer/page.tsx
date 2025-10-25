@@ -6,6 +6,7 @@ import styles from './dashboard.module.css';
 import EnhancedBookingForm from '@/src/components/booking/EnhancedBookingForm';
 
 const LeafletMap = dynamic(() => import('@/src/components/map/LeafletMap.client'), { ssr: false });
+const TrucksShowcase = dynamic(() => import('@/src/components/guest/TrucksShowcase.client'), { ssr: false });
 const InstagramChat = dynamic(() => import('@/src/components/chat/InstagramChat.client'), { ssr: false });
 const ChatNotificationBadge = dynamic(() => import('@/src/components/chat/ChatNotificationBadge.client'), { ssr: false });
 const IssueReportForm = dynamic(() => import('@/src/components/issues/IssueReportForm.client'), { ssr: false });
@@ -222,9 +223,11 @@ export default function CustomerDashboardPage() {
         } catch { /* ignore */ }
     }, []);
 
-    // Load bookings for this user/client
+    // Load bookings for this user/client with real-time updates
     useEffect(() => {
         let mounted = true;
+        const supabase = createClient();
+        
         async function loadBookings() {
             setBookingsError(null);
             try {
@@ -232,7 +235,6 @@ export default function CustomerDashboardPage() {
                     if (mounted) setBookings([]);
                     return;
                 }
-                const supabase = createClient();
                 setBookingsLoading(true);
                 const base = supabase
                     .from('bookings')
@@ -251,12 +253,75 @@ export default function CustomerDashboardPage() {
                 const { data, error } = res;
                 if (error) throw error;
                 if (mounted) setBookings((data || []) as Booking[]);
+                
+                // Set up real-time subscription for bookings updates
+                if (clientId || userId) {
+                    console.log('🔔 Setting up real-time bookings subscription for:', clientId ? `client: ${clientId}` : `user: ${userId}`);
+                    const filter = clientId ? `client_id=eq.${clientId}` : `user_id=eq.${userId}`;
+                    const channel = supabase
+                        .channel('bookings_realtime')
+                        .on(
+                            'postgres_changes',
+                            {
+                                event: 'UPDATE',
+                                schema: 'public',
+                                table: 'bookings',
+                                filter: filter,
+                            },
+                            (payload) => {
+                                console.log('✅ Booking updated:', payload);
+                                if (mounted && payload.new) {
+                                    setBookings((prev) => {
+                                        const updated = payload.new as Booking;
+                                        const index = prev.findIndex(b => b.id === updated.id);
+                                        if (index >= 0) {
+                                            const newBookings = [...prev];
+                                            newBookings[index] = updated;
+                                            console.log('📋 Booking status updated:', updated.id, '→', updated.status);
+                                            return newBookings;
+                                        } else {
+                                            return [updated, ...prev];
+                                        }
+                                    });
+                                }
+                            }
+                        )
+                        .on(
+                            'postgres_changes',
+                            {
+                                event: 'INSERT',
+                                schema: 'public',
+                                table: 'bookings',
+                                filter: filter,
+                            },
+                            (payload) => {
+                                console.log('✅ New booking inserted:', payload);
+                                if (mounted && payload.new) {
+                                    const newBooking = payload.new as Booking;
+                                    setBookings((prev) => [newBooking, ...prev]);
+                                    console.log('📋 New booking added:', newBooking.id);
+                                }
+                            }
+                        )
+                        .subscribe((status, err) => {
+                            console.log('📡 Bookings subscription status:', status);
+                            if (err) {
+                                console.error('❌ Bookings subscription error:', err);
+                            }
+                        });
+                    
+                    return () => {
+                        mounted = false;
+                        supabase.removeChannel(channel);
+                    };
+                }
             } catch (e: any) {
                 if (mounted) setBookingsError(e?.message ?? 'Failed to load bookings');
             } finally {
                 if (mounted) setBookingsLoading(false);
             }
         }
+        
         loadBookings();
         return () => { mounted = false; };
     }, [supabaseUrl, supabaseAnonKey, clientId, userId, reloadBookings]);
@@ -357,12 +422,19 @@ export default function CustomerDashboardPage() {
         if (statusLower === 'delivered') return `${styles.statusBadge} ${styles.statusDelivered}`;
         if (statusLower === 'rejected') return `${styles.statusBadge} ${styles.statusRejected}`;
         if (statusLower === 'submitted') return `${styles.statusBadge} ${styles.statusSubmitted}`;
+        if (statusLower === 'approved') return `${styles.statusBadge} ${styles.statusInTransit}`; // Use same style as in_transit
+        if (statusLower === 'cancelled') return `${styles.statusBadge} ${styles.statusRejected}`; // Use same style as rejected
         return styles.statusBadge;
     }
 
     function formatStatus(status: string | null) {
         if (!status) return '—';
-        return status.replace(/_/g, ' ');
+        // Format status for display
+        const formatted = status.replace(/_/g, ' ');
+        // Capitalize first letter of each word
+        return formatted.split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
     }
 
     return (
@@ -370,96 +442,43 @@ export default function CustomerDashboardPage() {
             <main className="dashboard-container">
                 <div className={`dashboard-header mb-18 ${styles.gradientText}`}>Welcome to RAJMOHAN TRANSPORT SERVICES</div>
 
-                {/* KPI Row */}
-                <div className={`${styles.kpiRow} mb-18`}>
-                    <div className={`${styles.kpi} card`}>
-                        <div className={styles.kpiTitle}>Active Shipments</div>
-                        <div className={styles.kpiValue}>{rows.filter(r => (r.status ?? '').toLowerCase() === 'in_transit').length}</div>
+                {/* KPI Row - Hidden for guest users */}
+                {!guestMode && (
+                    <div className={`${styles.kpiRow} mb-18`}>
+                        <div className={`${styles.kpi} card`}>
+                            <div className={styles.kpiTitle}>Active Shipments</div>
+                            <div className={styles.kpiValue}>{rows.filter(r => (r.status ?? '').toLowerCase() === 'in_transit').length}</div>
+                        </div>
+                        <div className={`${styles.kpi} card`}>
+                            <div className={styles.kpiTitle}>Pending Bookings</div>
+                            <div className={styles.kpiValue}>{bookings.filter(b => (b.status ?? '').toLowerCase() === 'submitted').length}</div>
+                        </div>
+                        <div className={`${styles.kpi} card`}>
+                            <div className={styles.kpiTitle}>Avg Delivery Time</div>
+                            <div className={styles.kpiValue}>2h 15m</div>
+                        </div>
+                        <div className={`${styles.kpi} card`}>
+                            <div className={styles.kpiTitle}>Revenue (Est.)</div>
+                            <div className={styles.kpiValue}>₹{rows.reduce((s, r) => s + (typeof r.cost === 'number' ? r.cost : 0), 0).toLocaleString('en-IN')}</div>
+                        </div>
                     </div>
-                    <div className={`${styles.kpi} card`}>
-                        <div className={styles.kpiTitle}>Pending Bookings</div>
-                        <div className={styles.kpiValue}>{bookings.filter(b => (b.status ?? '').toLowerCase() === 'submitted').length}</div>
-                    </div>
-                    <div className={`${styles.kpi} card`}>
-                        <div className={styles.kpiTitle}>Avg Delivery Time</div>
-                        <div className={styles.kpiValue}>2h 15m</div>
-                    </div>
-                    <div className={`${styles.kpi} card`}>
-                        <div className={styles.kpiTitle}>Revenue (Est.)</div>
-                        <div className={styles.kpiValue}>₹{rows.reduce((s, r) => s + (typeof r.cost === 'number' ? r.cost : 0), 0).toLocaleString('en-IN')}</div>
-                    </div>
-                </div>
+                )}
 
                 <div className="grid-2-1">
                     {/* suppress hydration mismatches from password manager/browser extensions injecting attributes */}
                     <section suppressHydrationWarning>
-                            <div className={`panel ${styles.panelCenter} ${styles.particleBackground}`} id="tracking">
-                            <div className="panel-title">Live Tracking</div>
-                            <LeafletMap mode="client" clientId={clientId} height={250} />
-                            <div className="progress">
-                                <div className="fill" />
-                            </div>
-                            <div className="eta">ETA: 2 hrs 15 min</div>
-                        </div>
-
-                        <div className={`panel ${styles.panelCenter}`} id="shipments">
-                            <div className="panel-title">Shipments</div>
-                            <div className="text-primary leading-17 mb-18">Delivered or in-progress shipments created after booking approvals.</div>
-                            <div className="row-gap-12">
-                                <input placeholder="Filter shipments..." className="filter-input" value={q} onChange={(e) => setQ(e.target.value)} />
-                                <select className="filter-input" aria-label="Status filter" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-                                    <option value="all">All</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="in_transit">In Transit</option>
-                                    <option value="delivered">Delivered</option>
-                                </select>
-                            </div>
-                            {loading && <div className="muted-small" style={{ padding: '20px', textAlign: 'center' }}>
-                                <div className={styles.loadingSpinner} style={{ margin: '0 auto 10px' }}></div>
-                                <div>Loading shipments...</div>
-                            </div>}
-                            {error && (
-                                <div role="alert" className={styles.errorMessage}>{error}</div>
-                            )}
-                            {!loading && !error && filtered.length === 0 && (
-                                <div className={styles.emptyState}>
-                                    <h3>No Shipments Found</h3>
-                                    <p>You don't have any shipments yet. Place an order to get started!</p>
-                                </div>
-                            )}
-                            {!loading && !error && filtered.length > 0 && (
-                                <div className={styles.tableWrapper}>
-                                <table className="table">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Origin</th>
-                                            <th>Destination</th>
-                                            <th>Status</th>
-                                            <th>Date</th>
-                                            <th>Cost</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filtered.map((row) => (
-                                            <tr key={row.id} className={styles.hoverCard} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                                                <td style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>{row.id.slice(0, 8)}…</td>
-                                                <td>{row.origin ?? '—'}</td>
-                                                <td>{row.destination ?? '—'}</td>
-                                                <td>
-                                                    <span className={getStatusBadgeClass(row.status)}>
-                                                        {formatStatus(row.status)}
-                                                    </span>
-                                                </td>
-                                                <td>{fmtDate(row.created_at)}</td>
-                                                <td style={{ fontWeight: '600', color: '#059669' }}>
-                                                    {typeof row.cost === 'number' ? `₹${row.cost.toLocaleString('en-IN')}` : '—'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                </div>
+                        <div className={`panel ${styles.panelCenter} ${guestMode ? '' : styles.particleBackground}`} id="tracking">
+                            <div className="panel-title">{guestMode ? '🚛 Our Fleet' : 'Live Tracking'}</div>
+                            {guestMode ? (
+                                <TrucksShowcase />
+                            ) : (
+                                <>
+                                    <LeafletMap mode="client" clientId={clientId} height={250} />
+                                    <div className="progress">
+                                        <div className="fill" />
+                                    </div>
+                                    <div className="eta">ETA: 2 hrs 15 min</div>
+                                </>
                             )}
                         </div>
 
@@ -557,80 +576,83 @@ export default function CustomerDashboardPage() {
                             )}
                         </div>
 
-                        <div className={`panel ${styles.panelCenter}`} id="my-bookings">
-                            <div className="panel-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span>My Bookings</span>
-                                <a 
-                                    href="/bookings" 
-                                    style={{ 
-                                        fontSize: '14px', 
-                                        fontWeight: 600, 
-                                        color: 'var(--brand)', 
-                                        textDecoration: 'none',
-                                        padding: '6px 12px',
-                                        borderRadius: '6px',
-                                        background: 'rgba(255, 77, 0, 0.1)',
-                                        transition: 'all 0.2s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 77, 0, 0.2)';
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    View All →
-                                </a>
-                            </div>
-                            <div className="text-primary leading-17 mb-18">Requests you submitted for approval. Approved bookings appear later as shipments.</div>
-                            {bookingsLoading && <div style={{ padding: '20px', textAlign: 'center' }}>
-                                <div className={styles.loadingSpinner} style={{ margin: '0 auto 10px' }}></div>
-                                <div>Loading bookings...</div>
-                            </div>}
-                            {bookingsError && <div role="alert" className={styles.errorMessage}>{bookingsError}</div>}
-                            {!bookingsLoading && !bookingsError && bookings.length === 0 && (
-                                <div className={styles.emptyState}>
-                                    <h3>No Bookings Yet</h3>
-                                    <p>Submit a booking request to get started!</p>
+                        {/* Hide My Bookings section for guest users */}
+                        {!guestMode && (
+                            <div className={`panel ${styles.panelCenter}`} id="my-bookings">
+                                <div className="panel-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span>My Bookings</span>
+                                    <a 
+                                        href="/bookings" 
+                                        style={{ 
+                                            fontSize: '14px', 
+                                            fontWeight: 600, 
+                                            color: 'var(--brand)', 
+                                            textDecoration: 'none',
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            background: 'rgba(255, 77, 0, 0.1)',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 77, 0, 0.2)';
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
+                                    >
+                                        View All →
+                                    </a>
                                 </div>
-                            )}
-                            {!bookingsLoading && !bookingsError && bookings.length > 0 && (
-                                <div className={styles.tableWrapper}>
-                                <table className="table">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Source</th>
-                                            <th>Destination</th>
-                                            <th>Weight (MT)</th>
-                                            <th>Pickup</th>
-                                            <th>Status</th>
-                                            <th>Created</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {bookings.map((b) => (
-                                            <tr key={b.id} className={styles.hoverCard} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                                                <td style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>{b.id.slice(0,8)}…</td>
-                                                <td>{b.source_city ?? '—'}</td>
-                                                <td>{b.destination_city ?? '—'}</td>
-                                                <td>{typeof b.weight_mt === 'number' ? b.weight_mt : '—'}</td>
-                                                <td>{fmtDate(b.pickup_date)}</td>
-                                                <td>
-                                                    <span className={getStatusBadgeClass(b.status)}>
-                                                        {formatStatus(b.status)}
-                                                    </span>
-                                                </td>
-                                                <td>{fmtDate(b.created_at)}</td>
+                                <div className="text-primary leading-17 mb-18">Requests you submitted for approval. Approved bookings appear later as shipments.</div>
+                                {bookingsLoading && <div style={{ padding: '20px', textAlign: 'center' }}>
+                                    <div className={styles.loadingSpinner} style={{ margin: '0 auto 10px' }}></div>
+                                    <div>Loading bookings...</div>
+                                </div>}
+                                {bookingsError && <div role="alert" className={styles.errorMessage}>{bookingsError}</div>}
+                                {!bookingsLoading && !bookingsError && bookings.length === 0 && (
+                                    <div className={styles.emptyState}>
+                                        <h3>No Bookings Yet</h3>
+                                        <p>Submit a booking request to get started!</p>
+                                    </div>
+                                )}
+                                {!bookingsLoading && !bookingsError && bookings.length > 0 && (
+                                    <div className={styles.tableWrapper}>
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Source</th>
+                                                <th>Destination</th>
+                                                <th>Weight (MT)</th>
+                                                <th>Pickup</th>
+                                                <th>Status</th>
+                                                <th>Created</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                </div>
-                            )}
-                        </div>
+                                        </thead>
+                                        <tbody>
+                                            {bookings.map((b) => (
+                                                <tr key={b.id} className={styles.hoverCard} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                                    <td style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>{b.id.slice(0,8)}…</td>
+                                                    <td>{b.source_city ?? '—'}</td>
+                                                    <td>{b.destination_city ?? '—'}</td>
+                                                    <td>{typeof b.weight_mt === 'number' ? b.weight_mt : '—'}</td>
+                                                    <td>{fmtDate(b.pickup_date)}</td>
+                                                    <td>
+                                                        <span className={getStatusBadgeClass(b.status)}>
+                                                            {formatStatus(b.status)}
+                                                        </span>
+                                                    </td>
+                                                    <td>{fmtDate(b.created_at)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className={`panel ${styles.panelCenter} ${styles.panelMiddle}`} id="rate">
                             <div className="panel-title">Rate Calculator</div>
@@ -770,102 +792,115 @@ export default function CustomerDashboardPage() {
                         </div>
                         <div className={`panel ${styles.panelCenter}`} id="documents">
                             <div className="panel-title">📄 Document Center</div>
-                            <p style={{ 
-                                fontSize: '0.875rem', 
-                                color: 'var(--text-secondary)', 
-                                marginBottom: '16px',
-                                textAlign: 'center' 
-                            }}>
-                                Access shipment documents by selecting a shipment below
-                            </p>
-                            
-                            {loading ? (
-                                <div style={{ padding: '20px', textAlign: 'center' }}>
-                                    <div className={styles.loadingSpinner} style={{ margin: '0 auto' }}></div>
-                                </div>
-                            ) : rows.length === 0 ? (
+                            {guestMode ? (
                                 <div className={styles.emptyState}>
-                                    <p>No shipments found. Documents will appear here once you have active shipments.</p>
+                                    <h3>🔒 Login Required</h3>
+                                    <p>Please login to access shipment documents</p>
+                                    <div className="row-gap-12" style={{display:'flex',gap:12,marginTop:16,justifyContent:'center'}}>
+                                        <a className={`btn-dark ${styles.enhancedButton}`} href="/login">Login</a>
+                                        <a className={`btn-dark ${styles.enhancedButton}`} href="/register">Sign Up</a>
+                                    </div>
                                 </div>
                             ) : (
-                                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {rows.slice(0, 5).map((shipment) => {
-                                        const isDelivered = shipment.status?.toLowerCase() === 'delivered';
-                                        const docsAvailable = isDelivered ? 4 : 3; // All 4 docs if delivered, else 3
-                                        
-                                        return (
-                                            <button
-                                                key={shipment.id}
-                                                onClick={() => {
-                                                    setSelectedShipmentForDocs(shipment.id);
-                                                    setShowDocuments(true);
-                                                }}
-                                                style={{
-                                                    width: '100%',
-                                                    padding: '12px',
-                                                    background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                                                    border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-                                                    borderRadius: '8px',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s',
-                                                    textAlign: 'left',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 77, 0, 0.05)';
-                                                    e.currentTarget.style.borderColor = 'var(--brand)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)';
-                                                    e.currentTarget.style.borderColor = isDarkMode ? '#334155' : '#e2e8f0';
-                                                }}
-                                            >
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ 
-                                                        fontSize: '0.813rem', 
-                                                        fontWeight: 600,
-                                                        color: 'var(--text)',
-                                                        marginBottom: '4px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '8px'
-                                                    }}>
-                                                        {shipment.origin} → {shipment.destination}
-                                                        <span style={{
-                                                            fontSize: '0.688rem',
-                                                            padding: '2px 6px',
-                                                            borderRadius: '4px',
-                                                            background: isDelivered ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                                                            color: isDelivered ? '#10b981' : '#3b82f6',
-                                                            fontWeight: 700
-                                                        }}>
-                                                            {docsAvailable}/4 docs
-                                                        </span>
-                                                    </div>
-                                                    <div style={{ 
-                                                        fontSize: '0.75rem', 
-                                                        color: 'var(--text-secondary)' 
-                                                    }}>
-                                                        ID: {String(shipment.id).slice(0, 8)}... • {shipment.status}
-                                                    </div>
+                                <>
+                                    <p style={{ 
+                                        fontSize: '0.875rem', 
+                                        color: 'var(--text-secondary)', 
+                                        marginBottom: '16px',
+                                        textAlign: 'center' 
+                                    }}>
+                                        Access shipment documents by selecting a shipment below
+                                    </p>
+                                    
+                                    {loading ? (
+                                        <div style={{ padding: '20px', textAlign: 'center' }}>
+                                            <div className={styles.loadingSpinner} style={{ margin: '0 auto' }}></div>
+                                        </div>
+                                    ) : rows.length === 0 ? (
+                                        <div className={styles.emptyState}>
+                                            <p>No shipments found. Documents will appear here once you have active shipments.</p>
+                                        </div>
+                                    ) : (
+                                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {rows.slice(0, 5).map((shipment) => {
+                                                const isDelivered = shipment.status?.toLowerCase() === 'delivered';
+                                                const docsAvailable = isDelivered ? 4 : 3; // All 4 docs if delivered, else 3
+                                                
+                                                return (
+                                                    <button
+                                                        key={shipment.id}
+                                                        onClick={() => {
+                                                            setSelectedShipmentForDocs(shipment.id);
+                                                            setShowDocuments(true);
+                                                        }}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '12px',
+                                                            background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                                                            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                                                            borderRadius: '8px',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s',
+                                                            textAlign: 'left',
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 77, 0, 0.05)';
+                                                            e.currentTarget.style.borderColor = 'var(--brand)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)';
+                                                            e.currentTarget.style.borderColor = isDarkMode ? '#334155' : '#e2e8f0';
+                                                        }}
+                                                    >
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ 
+                                                                fontSize: '0.813rem', 
+                                                                fontWeight: 600,
+                                                                color: 'var(--text)',
+                                                                marginBottom: '4px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '8px'
+                                                            }}>
+                                                                {shipment.origin} → {shipment.destination}
+                                                                <span style={{
+                                                                    fontSize: '0.688rem',
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: '4px',
+                                                                    background: isDelivered ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                                                                    color: isDelivered ? '#10b981' : '#3b82f6',
+                                                                    fontWeight: 700
+                                                                }}>
+                                                                    {docsAvailable}/4 docs
+                                                                </span>
+                                                            </div>
+                                                            <div style={{ 
+                                                                fontSize: '0.75rem', 
+                                                                color: 'var(--text-secondary)' 
+                                                            }}>
+                                                                ID: {String(shipment.id).slice(0, 8)}... • {shipment.status}
+                                                            </div>
+                                                        </div>
+                                                        <span style={{ color: 'var(--brand)', fontSize: '1.25rem' }}>→</span>
+                                                    </button>
+                                                );
+                                            })}
+                                            {rows.length > 5 && (
+                                                <div style={{ 
+                                                    textAlign: 'center', 
+                                                    padding: '8px 0',
+                                                    fontSize: '0.75rem',
+                                                    color: 'var(--text-secondary)'
+                                                }}>
+                                                    Showing 5 of {rows.length} shipments
                                                 </div>
-                                                <span style={{ color: 'var(--brand)', fontSize: '1.25rem' }}>→</span>
-                                            </button>
-                                        );
-                                    })}
-                                    {rows.length > 5 && (
-                                        <div style={{ 
-                                            textAlign: 'center', 
-                                            padding: '8px 0',
-                                            fontSize: '0.75rem',
-                                            color: 'var(--text-secondary)'
-                                        }}>
-                                            Showing 5 of {rows.length} shipments
+                                            )}
                                         </div>
                                     )}
-                                </div>
+                                </>
                             )}
                         </div>
                     <div className={`panel ${styles.panelCenter}`} id="aboutus">
@@ -957,68 +992,108 @@ export default function CustomerDashboardPage() {
                                 </details>
                             </div>
                         </div>
-                        
-                        <div className={`panel ${styles.panelCenter}`} id="quick-stats">
-                            <div className="panel-title">📊 Quick Stats</div>
-                            <div style={{ width: '100%' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                                    <span style={{ color: 'var(--muted)' }}>Total Shipments</span>
-                                    <strong style={{ color: 'var(--text)' }}>{rows.length}</strong>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                                    <span style={{ color: 'var(--muted)' }}>Total Bookings</span>
-                                    <strong style={{ color: 'var(--text)' }}>{bookings.length}</strong>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                                    <span style={{ color: 'var(--muted)' }}>Delivered</span>
-                                    <strong style={{ color: '#10b981' }}>{rows.filter(r => (r.status ?? '').toLowerCase() === 'delivered').length}</strong>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0' }}>
-                                    <span style={{ color: 'var(--muted)' }}>In Transit</span>
-                                    <strong style={{ color: '#3b82f6' }}>{rows.filter(r => (r.status ?? '').toLowerCase() === 'in_transit').length}</strong>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className={`panel ${styles.panelCenter}`} id="help-resources">
-                            <div className="panel-title">📚 Help Resources</div>
-                            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                <a href="/user-guide" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
-                                   onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
-                                   onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}>
-                                    📖 <span>User Guide</span>
-                                </a>
-                                <button 
-                                    onClick={() => setShowChat(true)}
-                                    style={{ 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        gap: '10px', 
-                                        padding: '10px', 
-                                        background: 'rgba(255, 77, 0, 0.05)', 
-                                        borderRadius: '8px', 
-                                        border: 'none',
-                                        color: 'var(--text)', 
-                                        transition: 'all 0.2s',
-                                        cursor: 'pointer',
-                                        width: '100%',
-                                        textAlign: 'left',
-                                        fontSize: 'inherit',
-                                        fontFamily: 'inherit'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}
-                                >
-                                    📞 <span>Contact Support</span>
-                                </button>
-                                <a href="mailto:support@rajmohantransport.com" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'rgba(255, 77, 0, 0.05)', borderRadius: '8px', textDecoration: 'none', color: 'var(--text)', transition: 'all 0.2s' }}
-                                   onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)'}
-                                   onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)'}>
-                                    📧 <span>Email Us</span>
-                                </a>
-                            </div>
-                        </div>
                     </aside>
+                </div>
+
+                {/* Help Resources - Full Width Section */}
+                <div className={`panel ${styles.panelCenter}`} id="help-resources" style={{ marginTop: '24px' }}>
+                    <div className="panel-title">📚 Help Resources</div>
+                    <div style={{ 
+                        width: '100%', 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(3, 1fr)', 
+                        gap: '16px',
+                        maxWidth: '800px',
+                        margin: '0 auto'
+                    }}>
+                        <a href="/user-guide" style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '10px', 
+                            padding: '20px 16px', 
+                            background: 'rgba(255, 77, 0, 0.05)', 
+                            borderRadius: '12px', 
+                            textDecoration: 'none', 
+                            color: 'var(--text)', 
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            fontWeight: 500,
+                            fontSize: '1rem',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                        }}
+                           onMouseEnter={(e) => {
+                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
+                               e.currentTarget.style.transform = 'translateY(-4px)';
+                               e.currentTarget.style.boxShadow = '0 8px 16px rgba(255, 77, 0, 0.2)';
+                           }}
+                           onMouseLeave={(e) => {
+                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)';
+                               e.currentTarget.style.transform = 'translateY(0)';
+                               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                           }}>
+                            📖 <span>User Guide</span>
+                        </a>
+                        <button 
+                            onClick={() => setShowChat(true)}
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '10px', 
+                                padding: '20px 16px', 
+                                background: 'rgba(255, 77, 0, 0.05)', 
+                                borderRadius: '12px', 
+                                border: 'none',
+                                color: 'var(--text)', 
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                cursor: 'pointer',
+                                width: '100%',
+                                fontSize: '1rem',
+                                fontFamily: 'inherit',
+                                fontWeight: 500,
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
+                                e.currentTarget.style.transform = 'translateY(-4px)';
+                                e.currentTarget.style.boxShadow = '0 8px 16px rgba(255, 77, 0, 0.2)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                            }}
+                        >
+                            📞 <span>Contact Support</span>
+                        </button>
+                        <a href="mailto:support@rajmohantransport.com" style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '10px', 
+                            padding: '20px 16px', 
+                            background: 'rgba(255, 77, 0, 0.05)', 
+                            borderRadius: '12px', 
+                            textDecoration: 'none', 
+                            color: 'var(--text)', 
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            fontWeight: 500,
+                            fontSize: '1rem',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                        }}
+                           onMouseEnter={(e) => {
+                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
+                               e.currentTarget.style.transform = 'translateY(-4px)';
+                               e.currentTarget.style.boxShadow = '0 8px 16px rgba(255, 77, 0, 0.2)';
+                           }}
+                           onMouseLeave={(e) => {
+                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)';
+                               e.currentTarget.style.transform = 'translateY(0)';
+                               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                           }}>
+                            📧 <span>Email Us</span>
+                        </a>
+                    </div>
                 </div>
             </main>
             
