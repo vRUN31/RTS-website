@@ -7,21 +7,392 @@
 ## 📋 Table of Contents
 
 - [Project Status](#-project-status)
+- [Architecture Overview](#-architecture-overview)
 - [What's Working](#-whats-working-fully-implemented)
 - [What's Not Working](#-whats-not-working-pending-implementation)
 - [Quick Start](#-quick-start)
 - [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
 - [Feature Roadmap](#-feature-roadmap)
 - [Documentation](#-documentation)
+- [Project Structure](#-project-structure)
 
 ---
 
 ## 🎯 Project Status
 
-**Last Updated:** October 17, 2025  
-**Version:** 2.1  
+**Last Updated:** October 26, 2025  
+**Version:** 2.2  
 **Status:** ✅ **Production-Ready Core Features** | 🚧 **Advanced Features In Progress**
+
+---
+
+## 🏗️ Architecture Overview
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Browser[Web Browser]
+        Mobile[Mobile Devices]
+    end
+    
+    subgraph "Next.js Application Layer"
+        Pages[Pages & Routes]
+        API[API Routes]
+        Components[React Components]
+        Auth[Auth Middleware]
+    end
+    
+    subgraph "Backend Services"
+        Supabase[Supabase Backend]
+        DB[(PostgreSQL DB)]
+        Storage[Storage Buckets]
+        Realtime[Realtime Engine]
+        Email[Email Service]
+    end
+    
+    subgraph "External Services"
+        Maps[Leaflet/OSM Maps]
+        Route[OSRM Routing]
+        Geo[Nominatim Geocoding]
+    end
+    
+    Browser --> Pages
+    Mobile --> Pages
+    Pages --> Auth
+    Auth --> API
+    API --> Supabase
+    Components --> Realtime
+    Supabase --> DB
+    Supabase --> Storage
+    Supabase --> Realtime
+    API --> Email
+    Components --> Maps
+    Components --> Route
+    Components --> Geo
+    
+    style Browser fill:#4CAF50
+    style Mobile fill:#4CAF50
+    style Supabase fill:#3ECF8E
+    style DB fill:#336791
+    style Realtime fill:#FF6B6B
+```
+
+### Database Schema Overview
+
+```mermaid
+erDiagram
+    profiles ||--o{ bookings : creates
+    profiles ||--o{ shipments : tracks
+    profiles }o--|| clients : belongs_to
+    clients ||--o{ contracts : has
+    clients ||--o{ shipments : owns
+    contracts ||--o{ shipments : governs
+    trucks ||--o{ shipments : transports
+    trucks ||--o{ telemetry : emits
+    trucks }o--o| drivers : assigned_to
+    trucks ||--o{ trips : performs
+    trucks ||--o{ maintenance_records : requires
+    trucks ||--o{ fuel_records : consumes
+    drivers ||--o{ driver_performance : measured_by
+    bookings ||--o| shipments : converts_to
+    
+    profiles {
+        uuid id PK
+        text role
+        text name
+        text email
+        uuid client_id FK
+    }
+    
+    clients {
+        uuid id PK
+        text name
+        text contact
+    }
+    
+    contracts {
+        uuid id PK
+        uuid client_id FK
+        date start_at
+        date end_at
+    }
+    
+    bookings {
+        uuid id PK
+        uuid user_id FK
+        text status
+        text vehicle_type
+        numeric weight_mt
+    }
+    
+    shipments {
+        uuid id PK
+        uuid client_id FK
+        uuid truck_id FK
+        text origin
+        text destination
+        text status
+        numeric cost
+    }
+    
+    trucks {
+        uuid id PK
+        text plate
+        text status
+        uuid driver_id FK
+        text vehicle_type
+    }
+    
+    drivers {
+        uuid id PK
+        text name
+        text phone
+        text license
+    }
+    
+    telemetry {
+        uuid id PK
+        uuid truck_id FK
+        timestamp ts
+        numeric lat
+        numeric lng
+        numeric speed
+    }
+```
+
+### Authentication & Authorization Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant L as Login Page
+    participant A as Auth Middleware
+    participant S as Supabase Auth
+    participant D as Database
+    participant P as Protected Page
+    
+    U->>L: Enter credentials
+    L->>S: signInWithPassword()
+    S->>D: Verify credentials
+    D->>S: User data
+    S->>L: Auth session + JWT
+    L->>D: Check profiles table
+    D->>L: role + client_id
+    
+    alt Admin Role
+        L->>P: Redirect to /admin
+    else Client Role
+        L->>P: Redirect to /dashboard/customer
+    end
+    
+    U->>P: Access protected route
+    P->>A: Check auth
+    A->>S: Verify JWT
+    S->>A: Valid session
+    A->>D: Check RLS policies
+    D->>A: Authorized
+    A->>P: Render page
+    P->>U: Display content
+```
+
+### Booking Workflow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: Client creates booking
+    Pending --> Approved: Admin approves
+    Pending --> Rejected: Admin rejects
+    Approved --> ShipmentCreated: System creates shipment
+    ShipmentCreated --> TruckAssigned: Admin assigns truck
+    TruckAssigned --> TripConfirmed: Admin confirms trip details
+    TripConfirmed --> InTransit: Driver starts journey
+    InTransit --> Delivered: Arrives at destination
+    InTransit --> Delayed: Issues encountered
+    Delayed --> InTransit: Resolved
+    Delivered --> [*]
+    Rejected --> [*]
+    
+    note right of Pending
+        Client selects vehicle type,
+        route, weight, pickup date
+    end note
+    
+    note right of Approved
+        Email sent to client
+        Notification created
+    end note
+    
+    note right of TripConfirmed
+        Email sent to driver
+        Real-time tracking enabled
+    end note
+    
+    note right of InTransit
+        GPS telemetry updates
+        Client can track location
+    end note
+```
+
+### Real-time Data Flow
+
+```mermaid
+graph LR
+    subgraph "Data Sources"
+        GPS[GPS Device]
+        AdminAction[Admin Actions]
+        ClientAction[Client Actions]
+    end
+    
+    subgraph "Database Layer"
+        Telemetry[(telemetry)]
+        Bookings[(bookings)]
+        Shipments[(shipments)]
+        Notifications[(notifications)]
+    end
+    
+    subgraph "Realtime Engine"
+        RTEngine[Supabase Realtime]
+    end
+    
+    subgraph "Client Applications"
+        AdminMap[Admin Map View]
+        ClientMap[Client Map View]
+        Dashboard[Dashboards]
+        Chat[Chat Interface]
+    end
+    
+    GPS -->|INSERT| Telemetry
+    AdminAction -->|UPDATE| Bookings
+    AdminAction -->|UPDATE| Shipments
+    ClientAction -->|INSERT| Bookings
+    
+    Telemetry -->|SUBSCRIBE| RTEngine
+    Bookings -->|SUBSCRIBE| RTEngine
+    Shipments -->|SUBSCRIBE| RTEngine
+    Notifications -->|SUBSCRIBE| RTEngine
+    
+    RTEngine -->|Live Updates| AdminMap
+    RTEngine -->|Live Updates| ClientMap
+    RTEngine -->|Live Updates| Dashboard
+    RTEngine -->|Live Updates| Chat
+    
+    style GPS fill:#FF6B6B
+    style RTEngine fill:#3ECF8E
+    style AdminMap fill:#4CAF50
+    style ClientMap fill:#4CAF50
+```
+
+### Component Architecture
+
+```mermaid
+graph TB
+    subgraph "Server Components"
+        AdminPage[Admin Dashboard]
+        CustomerPage[Customer Dashboard]
+        FleetPage[Fleet Management]
+        Analytics[Analytics Page]
+    end
+    
+    subgraph "Client Components"
+        Map[LeafletMap.client]
+        Modal[Modal Components]
+        Chat[Chat Interface]
+        Forms[Form Components]
+        Theme[Theme Toggle]
+    end
+    
+    subgraph "Shared Utilities"
+        SupabaseClient[Supabase Client]
+        SupabaseServer[Supabase Server]
+        AuthHelpers[Auth Helpers]
+        DateUtils[Date Utilities]
+    end
+    
+    AdminPage --> Map
+    AdminPage --> Modal
+    CustomerPage --> Map
+    CustomerPage --> Forms
+    FleetPage --> Modal
+    Analytics --> Theme
+    
+    Map --> SupabaseClient
+    Modal --> SupabaseClient
+    Chat --> SupabaseClient
+    Forms --> SupabaseClient
+    
+    AdminPage --> SupabaseServer
+    CustomerPage --> SupabaseServer
+    FleetPage --> SupabaseServer
+    Analytics --> SupabaseServer
+    
+    SupabaseClient --> AuthHelpers
+    SupabaseServer --> AuthHelpers
+    
+    style Map fill:#FFD700
+    style Modal fill:#FFD700
+    style SupabaseClient fill:#3ECF8E
+    style SupabaseServer fill:#3ECF8E
+```
+
+---
+
+## 🆕 Latest Updates (October 2025)
+
+### Recent Enhancements
+
+#### 🎨 Dark Mode Optimization (Oct 26, 2025)
+- ✅ Complete dark mode overhaul for Advanced Truck Management page
+- ✅ Consistent CSS variable usage across all components
+- ✅ Improved contrast ratios for better accessibility
+- ✅ Enhanced visibility of dropdowns, tables, and modals in dark mode
+- ✅ Smooth theme transitions with proper color inheritance
+
+#### 📁 Documentation Consolidation (Oct 26, 2025)
+- ✅ Merged `docs/` and `Documents/` directories into unified `/Documents`
+- ✅ Organized 115+ documentation files for easier navigation
+- ✅ Added comprehensive mermaid architecture diagrams
+- ✅ Updated README with latest system architecture
+- ✅ Consolidated all SQL scripts into `/supabase` directory
+
+#### 🚚 Truck Status Management (Oct 25, 2025)
+- ✅ Auto-update truck status based on telemetry data
+- ✅ Public read access for trucks (guest user showcase)
+- ✅ Enhanced truck status history tracking
+- ✅ Improved status badge visibility in dark mode
+
+#### 📧 Email System Enhancements (Oct 16, 2025)
+- ✅ Professional HTML email templates for drivers and clients
+- ✅ Dynamic email routing with accurate trip details
+- ✅ Mobile-responsive email design
+- ✅ Graceful error handling (non-blocking)
+- ✅ Email logging to database for audit trail
+
+#### ⚙️ Settings System (Oct 15, 2025)
+- ✅ Comprehensive user settings page
+- ✅ Theme customization (light/dark, accent colors)
+- ✅ Language selection (English, Hindi, Marathi)
+- ✅ Notification preferences (email, SMS, in-app)
+- ✅ Profile management with emergency contacts
+
+#### 📊 Analytics & Profit/Loss (Oct 15, 2025)
+- ✅ Truck-wise profit/loss analytics
+- ✅ Interactive Chart.js visualizations
+- ✅ Real-time data refresh every 30 seconds
+- ✅ Date range filters with custom presets
+- ✅ CSV export functionality
+
+### Migration Notes
+
+If upgrading from earlier versions:
+
+1. **Run Database Migrations**: Execute all migration files in `supabase/migrations/` in chronological order
+2. **Update Environment Variables**: Check `.env.local.example` for new required variables
+3. **Clear Cache**: Run `bun run build` or `npm run build` to clear Next.js cache
+4. **Verify RLS Policies**: Ensure all RLS policies from `schema.sql` are applied
+5. **Test Dark Mode**: Toggle theme and verify all pages render correctly
+6. **Update Documentation References**: Point to `/Documents` instead of `/docs`
 
 ---
 
@@ -878,56 +1249,170 @@ graph TB
 ├── app/                       # Top-level route shims (re-export from src/app)
 │   ├── page.tsx              # Home redirect
 │   ├── layout.tsx            # Root layout
-│   ├── admin/
-│   ├── bookings/
-│   ├── contracts/
-│   ├── dashboard/
-│   └── ...
-├── src/
-│   ├── app/                  # Canonical Next.js app
+│   ├── admin/                # Admin routes
+│   │   ├── page.tsx          # Re-export admin dashboard
+│   │   └── analytics/        # Re-export analytics
+│   ├── bookings/             # Re-export bookings
+│   ├── contracts/            # Re-export contracts
+│   ├── dashboard/            # Re-export dashboards
+│   ├── login/                # Re-export login
+│   ├── register/             # Re-export register
+│   └── settings/             # Re-export settings
+│
+├── src/                      # Main application source
+│   ├── app/                  # Canonical Next.js App Router
 │   │   ├── _*.client.tsx     # Global client components (effects, nav, topbar)
-│   │   ├── globals.css       # Global styles + dark mode
+│   │   ├── globals.css       # Global styles + CSS variables for theming
 │   │   ├── layout.tsx        # Root layout with Leaflet CSS
 │   │   ├── page.tsx          # Landing/login redirect
-│   │   ├── admin/            # Admin routes
-│   │   │   ├── page.tsx      # Admin dashboard
+│   │   │
+│   │   ├── admin/            # Admin-only routes (SSR protected)
+│   │   │   ├── page.tsx      # Admin dashboard (KPIs, map, bookings)
+│   │   │   ├── admin.css     # Admin dashboard styles
 │   │   │   ├── analytics/    # Analytics dashboard
-│   │   │   ├── export/       # CSV export API
-│   │   │   └── manage-trucks/ # Fleet management
+│   │   │   │   ├── page.tsx  # Charts, metrics, export
+│   │   │   │   └── analytics.css
+│   │   │   ├── fleet/        # Fleet management
+│   │   │   │   ├── page.tsx  # Trucks, drivers, trips, maintenance
+│   │   │   │   └── fleet.css
+│   │   │   ├── manage-trucks/ # Advanced truck management
+│   │   │   │   ├── page.tsx  # CRUD operations, driver assignment
+│   │   │   │   └── manage-trucks.css
+│   │   │   ├── support/      # Admin support chat
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── support.css
+│   │   │   └── export/       # Export functionality
+│   │   │       └── shipments/
+│   │   │           └── route.ts  # CSV export API
+│   │   │
+│   │   ├── api/              # API routes
+│   │   │   ├── bookings/
+│   │   │   │   ├── approve/
+│   │   │   │   │   └── route.ts  # Approve booking
+│   │   │   │   └── reject/
+│   │   │   │       └── route.ts  # Reject booking
+│   │   │   ├── shipments/
+│   │   │   │   └── [id]/
+│   │   │   │       ├── start/
+│   │   │   │       │   └── route.ts  # Start shipment
+│   │   │   │       └── end/
+│   │   │   │           └── route.ts  # End shipment
+│   │   │   └── drivers/
+│   │   │       └── route.ts      # Create driver
+│   │   │
 │   │   ├── bookings/         # Client bookings page
-│   │   │   ├── page.tsx
+│   │   │   ├── page.tsx      # View all bookings, search, filter
 │   │   │   └── bookings.css
-│   │   ├── contracts/        # Contracts list
+│   │   │
+│   │   ├── contracts/        # Contracts listing
+│   │   │   ├── page.tsx      # Active/Expired contracts
+│   │   │   └── contracts.css
+│   │   │
 │   │   ├── dashboard/
 │   │   │   └── customer/     # Client dashboard
-│   │   ├── forgot-password/  # Password reset
+│   │   │       ├── page.tsx  # Booking form, shipments, map
+│   │   │       └── customer.css
+│   │   │
+│   │   ├── forgot-password/  # Password reset flow
+│   │   │   └── page.tsx
+│   │   │
 │   │   ├── login/            # Login page
-│   │   ├── register/         # Signup page
-│   │   └── settings/         # User settings
-│   ├── components/           # Reusable components
+│   │   │   ├── page.tsx
+│   │   │   └── login.css
+│   │   │
+│   │   ├── register/         # User registration
+│   │   │   ├── page.tsx
+│   │   │   └── register.css
+│   │   │
+│   │   ├── settings/         # User settings
+│   │   │   ├── page.tsx      # Profile, theme, notifications
+│   │   │   └── settings.css
+│   │   │
+│   │   └── user-guide/       # User documentation
+│   │       ├── page.tsx
+│   │       └── user-guide.css
+│   │
+│   ├── components/           # Reusable React components
 │   │   ├── admin/
-│   │   │   ├── AdminAnalytics.client.tsx
-│   │   │   └── BookingActionRow.client.tsx
-│   │   └── map/
-│   │       └── LeafletMap.client.tsx
-│   ├── config/
-│   │   └── supabase.ts       # Supabase config
-│   ├── types/
-│   │   └── global.d.ts       # TypeScript types
-│   ├── utils/
+│   │   │   ├── AdminAnalytics.client.tsx       # Chart.js analytics
+│   │   │   ├── AssignTruckModal.client.tsx     # Assign truck modal
+│   │   │   ├── BookingActionRow.client.tsx     # Booking actions
+│   │   │   ├── OpenAssignTruckModalListener.client.tsx
+│   │   │   └── TripConfirmationModal.client.tsx
+│   │   ├── map/
+│   │   │   └── LeafletMap.client.tsx           # Leaflet map component
+│   │   └── chat/
+│   │       └── ChatInterface.client.tsx        # Instagram-style chat
+│   │
+│   ├── config/               # Configuration files
+│   │   └── supabase.ts       # Supabase configuration
+│   │
+│   ├── types/                # TypeScript type definitions
+│   │   └── global.d.ts       # Global types
+│   │
+│   ├── utils/                # Utility functions
 │   │   └── supabase/
-│   │       ├── client.ts     # Client-side Supabase
-│   │       └── server.ts     # Server-side Supabase
-│   ├── middleware.ts         # Auth middleware
-│   └── Dasboard/             # Legacy static HTML (reference only)
-├── supabase/
-│   ├── schema.sql            # Database schema (idempotent)
-│   └── seed.sql              # Sample data
-├── Documents/                # Feature documentation (66+ files)
-├── .env.local.example        # Environment template
-├── next.config.mjs           # Next.js config
-├── tsconfig.json             # TypeScript config
+│   │       ├── client.ts     # Client-side Supabase instance
+│   │       └── server.ts     # Server-side Supabase instance
+│   │
+│   ├── middleware.ts         # Next.js middleware (auth, redirects)
+│   │
+│   └── Dasboard/             # Legacy static HTML (kept for reference)
+│       └── customer.html     # Original customer dashboard prototype
+│
+├── supabase/                 # Database & migrations
+│   ├── schema.sql            # Complete database schema (idempotent)
+│   ├── seed.sql              # Sample seed data
+│   ├── storage-setup.sql     # Storage bucket setup
+│   ├── debug-drivers-table.sql
+│   ├── verify-fleet-setup.sql
+│   ├── RUN_THIS_IN_SUPABASE.sql  # Initial setup script
+│   ├── CHECK_TEJAS_SALARY.sql    # Salary verification
+│   └── migrations/           # Database migrations
+│       ├── 2025-01-15-add-driver-salary-fields.sql
+│       ├── 2025-01-16-add-booking-route-data.sql
+│       ├── 2025-10-12-chat-system.sql
+│       ├── 2025-10-12-fleet-management-features.sql
+│       ├── 2025-10-14-add-settings-tables.sql
+│       ├── 2025-10-15-truck-profit-loss-analytics.sql
+│       ├── 2025-10-25-auto-update-truck-status.sql
+│       └── ... (25+ migration files)
+│
+├── Documents/                # Comprehensive documentation (115+ files)
+│   ├── BOOKINGS_IMPLEMENTATION.md
+│   ├── CHAT_FEATURE_DOCUMENTATION.md
+│   ├── EMAIL_NOTIFICATION_SYSTEM.md
+│   ├── FLEET_MANAGEMENT_FEATURES.md
+│   ├── DARK_MODE_TRUCK_MANAGEMENT.md
+│   ├── TRUCK_STATUS_MANAGEMENT.md
+│   ├── SETTINGS_DOCUMENTATION.md
+│   ├── GUEST_USER_TRUCKS_SHOWCASE.md
+│   └── ... (110+ more documentation files)
+│
+├── scripts/                  # Utility scripts
+│
+├── utils/                    # Top-level utilities
+│
+├── .env.local.example        # Environment variables template
+├── .env.local                # Local environment (git-ignored)
+├── .github/
+│   └── copilot-instructions.md  # AI coding instructions
+├── next.config.mjs           # Next.js configuration
+├── tsconfig.json             # TypeScript configuration
+├── package.json              # Dependencies and scripts
+├── bun.lock                  # Bun lockfile
 └── README.md                 # This file
+
+Key Features:
+- ✅ Server Components (SSR) by default for better performance
+- ✅ Client Components (.client.tsx) only where needed (state, effects)
+- ✅ Top-level app/ shims for route stability
+- ✅ Centralized styles in src/app/globals.css
+- ✅ Type-safe with TypeScript
+- ✅ RLS-protected Supabase backend
+- ✅ Real-time subscriptions for live updates
+- ✅ Comprehensive documentation in Documents/
+- ✅ All SQL scripts consolidated in supabase/
 ```
 
 ### Core Routes & Workflows
@@ -1112,48 +1597,120 @@ const channel = supabase
 
 ## 📚 Documentation
 
-### Feature Documentation (66+ files in `/Documents`)
+### Comprehensive Documentation (115+ files in `/Documents`)
 
-#### Implementation Guides
+All documentation has been consolidated into the `/Documents` directory for easier navigation and maintenance.
+
+#### 📖 Implementation Guides
 - `BOOKINGS_IMPLEMENTATION.md` - Bookings page features, testing, troubleshooting
 - `FLEET_SETUP_GUIDE.md` - Fleet management setup steps
 - `ROUTE_BOOKING_README.md` - Route booking with map integration
 - `USER_GUIDE_IMPLEMENTATION.md` - User guide page
 - `BOOKING_APPROVAL_SYSTEM.md` - Admin booking approval workflow
 - `TRIP-CONFIRMATION-SYSTEM.md` - Trip confirmation process
+- `DRIVER_SALARY_IMPLEMENTATION.md` - Driver salary management
+- `SETTINGS_DOCUMENTATION.md` - User settings and preferences
 
-#### Feature Documentation
+#### ⚡ Feature Documentation
 - `CHAT_FEATURE_DOCUMENTATION.md` - Chat system architecture
 - `CONTRACT_FEATURES.md` - Contract management features
 - `FLEET_MANAGEMENT_FEATURES.md` - Fleet module overview
 - `VEHICLE_TYPE_FEATURE.md` - Vehicle type selection
+- `PREVENT_DOUBLE_BOOKING_TRUCKS.md` - Double booking prevention
+- `MULTIPLE_DRIVERS_IMPLEMENTATION.md` - Multi-driver assignment
+- `TRUCK_PROFIT_LOSS_ANALYTICS_GUIDE.md` - Profit/loss analytics
+
+#### 📧 Email System Documentation
 - `EMAIL_NOTIFICATION_SYSTEM.md` - Email system complete guide ✅
 - `EMAIL_IMPLEMENTATION_SUMMARY.md` - Email feature overview ✅
 - `EMAIL_QUICK_START.md` - Quick setup for emails ✅
 - `CLIENT_EMAIL_SYSTEM.md` - Client email notifications ✅
+- `CLIENT_EMAIL_IMPLEMENTATION_SUMMARY.md` - Client email details ✅
+- `CLIENT_EMAIL_TESTING_CHECKLIST.md` - Email testing checklist ✅
+- `EMAIL_TEMPLATE_REFERENCE.md` - Email template documentation ✅
+- `TROUBLESHOOTING_CLIENT_EMAIL.md` - Email troubleshooting ✅
+- `EMAIL_NOTIFICATION_DYNAMIC_ROUTES.md` - Dynamic email routing ✅
+
+#### 🚚 Truck Status & Management
+- `TRUCK_STATUS_MANAGEMENT.md` - Truck status system
+- `TRUCK_STATUS_INTEGRATION.md` - Status integration guide
+- `TRUCK_STATUS_QUICK_SETUP.md` - Quick setup guide
+- `DARK_MODE_TRUCK_MANAGEMENT.md` - Dark mode truck management
+- `FIX_TRUCK_STATUS_ISSUE.md` - Status issue fixes
+- `MANAGE_TRUCKS_ENHANCEMENTS.md` - Truck management enhancements
+
+#### 🎨 UI/UX Documentation
+- `DARK_MODE_BEFORE_AFTER.md` - Dark mode visual comparison
+- `DARK_MODE_ENHANCEMENTS.md` - Dark mode features
+- `DARK_MODE_OPTIMIZATION.md` - Dark mode optimization
+- `DARK_MODE_FIXES.md` - Dark mode bug fixes
+- `GLOBAL_UI_UX_ENHANCEMENTS.md` - Global UI improvements
+- `THEME_TOGGLE_FIX.md` - Theme toggle implementation
+- `BUTTON_DROPDOWN_ENHANCEMENTS.md` - Dropdown improvements
+- `DROPDOWN_ARROW_FIX.md` - Dropdown arrow fixes
+
+#### 🗺️ Route & Map Documentation
+- `ROUTE_MAP_IMPLEMENTATION_SUMMARY.md` - Route map overview
+- `ROUTE_MAP_VISUAL_GUIDE.md` - Map interaction guide
+- `ROUTE_MAP_ENHANCEMENTS.md` - Map feature enhancements
+- `ROUTE_MAP_UX_ENHANCEMENTS.md` - Map UX improvements
+- `ROUTE_MAP_BOOKING_FEATURE.md` - Booking with route map
 - `DYNAMIC_DISTANCE_TIME.md` - Distance/time calculation
 
-#### Visual Guides
+#### 📖 Visual Guides
 - `CHAT_VISUAL_GUIDE.md` - Chat UI screenshots
-- `ROUTE_MAP_VISUAL_GUIDE.md` - Map interaction guide
 - `THEME_TOGGLE_VISUAL_GUIDE.md` - Dark mode usage
+- `FLEET_TAB_VISUAL_GUIDE.md` - Fleet tab screenshots
+- `DROPDOWN_ARROW_VISUAL_GUIDE.md` - Dropdown visual reference
+- `VISUAL_REFERENCE_TRUCK_MODAL.md` - Truck modal screenshots
 
-#### Quick References
+#### 🚀 Quick References
 - `CHAT_QUICK_REFERENCE.md` - Chat system quick ref
 - `FLEET_QUICK_REFERENCE.md` - Fleet management quick ref
+- `DEVELOPER_QUICK_REFERENCE.md` - Developer quick start
 - `BOOKING_TESTING_GUIDE.md` - Booking testing checklist
 - `QUICK_START_TESTING_GUIDE.md` - Overall testing guide
+- `QUICK_START_NOTIFICATIONS.md` - Notifications setup
+- `QUICK_START_REPORT_ISSUE.md` - Issue reporting setup
+- `QUICK_START_DYNAMIC_ROUTE.md` - Dynamic route setup
 
-#### Fix Documentation
+#### 🔧 Fix Documentation
 - `API_ROUTE_FIX.md` - API route troubleshooting
 - `FIX_REFRESH_TOKEN_ERROR.md` - Auth token fix
 - `FLEET_404_FIX.md` - Fleet page routing fix
 - `FIX_CONTRACTS_RLS_POLICIES.md` - Contract RLS fix
+- `FIX_LOGIN_AND_USER_MENU.md` - Login/menu fixes
+- `FIX_SIGNUP_ERROR.md` - Signup error fixes
+- `FIX_CLIENTS_TABLE_SCHEMA.md` - Clients table fixes
+- `FIX_EMAIL_NOT_CONFIRMED.md` - Email confirmation fix
+- `FIX_BOOKING_STATUS_AND_DOCUMENTS.md` - Booking status fixes
+- `FIX_404_USER_GUIDE.md` - 404 page fixes
 
-### Schema Documentation
+#### 🗃️ Schema & Database Documentation
 - `BOOKINGS_SCHEMA_GUIDE.md` - Bookings table structure, RLS policies
 - `supabase/schema.sql` - Complete database schema with comments
 - `supabase/seed.sql` - Sample data for testing
+- `supabase/RUN_THIS_IN_SUPABASE.sql` - Initial setup SQL
+- `supabase/CHECK_TEJAS_SALARY.sql` - Salary verification script
+
+#### 📋 Summary Documents
+- `FEATURE_COMPLETE_SUMMARY.md` - Complete feature overview
+- `IMPLEMENTATION_SUMMARY.md` - Implementation summary
+- `FEATURE_SUMMARY_DOUBLE_BOOKING.md` - Double booking summary
+- `REAL_WORKFLOW_NO_DUMMY_DATA.md` - Production workflow
+- `GUEST_USER_TRUCKS_SHOWCASE.md` - Guest user features
+
+### 📁 Document Organization
+
+The `/Documents` directory is organized by topic and includes:
+- **Feature guides** for major system components
+- **Visual guides** with screenshots and diagrams
+- **Quick references** for rapid development
+- **Fix documentation** for troubleshooting common issues
+- **Schema documentation** for database structure
+- **Testing checklists** for quality assurance
+
+All legacy documentation from the `docs/` directory has been merged into `Documents/` for unified access.
 
 ---
 
