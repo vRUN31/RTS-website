@@ -235,6 +235,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
                 </div>
                 <div className="row-gap-12">
                     <a className="btn-dark no-underline" href={`/contracts`}>Create Contract</a>
+                    <a className="btn-dark no-underline" href={`/documents`}>📁 Documents</a>
                     <a className="btn-dark no-underline" href={`/admin/export/shipments?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`}>Export Shipments CSV</a>
                 </div>
             </div>

@@ -21,7 +21,7 @@
 ## 🎯 Project Status
 
 **Last Updated:** October 26, 2025  
-**Version:** 2.2  
+**Version:** 2.3  
 **Status:** ✅ **Production-Ready Core Features** | 🚧 **Advanced Features In Progress**
 
 ---
@@ -88,15 +88,21 @@ erDiagram
     profiles }o--|| clients : belongs_to
     clients ||--o{ contracts : has
     clients ||--o{ shipments : owns
+    clients ||--o{ invoices : receives
+    clients ||--o{ notifications : receives
     contracts ||--o{ shipments : governs
+    contracts ||--o{ contract_documents : has
     trucks ||--o{ shipments : transports
     trucks ||--o{ telemetry : emits
+    trucks ||--o{ truck_documents : requires
     trucks }o--o| drivers : assigned_to
     trucks ||--o{ trips : performs
     trucks ||--o{ maintenance_records : requires
     trucks ||--o{ fuel_records : consumes
     drivers ||--o{ driver_performance : measured_by
+    drivers ||--o{ driver_documents : possesses
     bookings ||--o| shipments : converts_to
+    invoices ||--o| shipments : bills_for
     
     profiles {
         uuid id PK
@@ -110,6 +116,7 @@ erDiagram
         uuid id PK
         text name
         text contact
+        text email
     }
     
     contracts {
@@ -160,6 +167,61 @@ erDiagram
         numeric lng
         numeric speed
     }
+    
+    document_categories {
+        uuid id PK
+        text name UK
+        text description
+        text icon
+        text color
+    }
+    
+    invoices {
+        uuid id PK
+        text invoice_number UK
+        uuid client_id FK
+        uuid shipment_id FK
+        date issue_date
+        date due_date
+        numeric total_amount
+        text status
+        text document_path
+    }
+    
+    driver_documents {
+        uuid id PK
+        uuid driver_id FK
+        text document_type
+        text file_path
+        date expiry_date
+        text status
+    }
+    
+    truck_documents {
+        uuid id PK
+        text truck_id FK
+        text document_type
+        text file_path
+        date expiry_date
+        text status
+    }
+    
+    contract_documents {
+        uuid id PK
+        uuid contract_id FK
+        text document_type
+        text file_path
+        numeric file_size
+    }
+    
+    notifications {
+        uuid id PK
+        uuid user_id FK
+        text title
+        text message
+        text type
+        boolean read
+    }
 ```
 
 ### Authentication & Authorization Flow
@@ -197,7 +259,7 @@ sequenceDiagram
     P->>U: Display content
 ```
 
-### Booking Workflow
+### Booking & Document Workflow
 
 ```mermaid
 stateDiagram-v2
@@ -211,7 +273,9 @@ stateDiagram-v2
     InTransit --> Delivered: Arrives at destination
     InTransit --> Delayed: Issues encountered
     Delayed --> InTransit: Resolved
-    Delivered --> [*]
+    Delivered --> DocumentsGenerated: Admin uploads documents
+    DocumentsGenerated --> ClientNotified: Client receives notification
+    ClientNotified --> [*]
     Rejected --> [*]
     
     note right of Pending
@@ -232,6 +296,17 @@ stateDiagram-v2
     note right of InTransit
         GPS telemetry updates
         Client can track location
+    end note
+    
+    note right of DocumentsGenerated
+        Contract documents
+        Invoice PDFs
+        Delivery proofs
+    end note
+    
+    note right of ClientNotified
+        Email + In-app notification
+        Documents accessible in portal
     end note
 ```
 
@@ -341,6 +416,47 @@ graph TB
 ## 🆕 Latest Updates (October 2025)
 
 ### Recent Enhancements
+
+#### 📁 Document Management System (Oct 26, 2025) ✅
+- ✅ **Complete Document Management Module** (`/documents`)
+  - Contract documents with client routing
+  - Invoice PDFs with automatic invoice records
+  - Driver licenses and certifications
+  - Truck insurance and registration
+  - Miscellaneous documents
+- ✅ **Client-Specific Document Routing**
+  - Auto-route contracts, invoices, and misc docs to specific clients
+  - Client selection dropdown with email display
+  - Automatic client notification system
+- ✅ **Smart Upload Modal**
+  - Dynamic form fields based on document type
+  - File validation (10MB limit, PDF/JPG/PNG)
+  - Client and entity selectors
+  - Date fields (issue/expiry)
+  - Description and notes
+- ✅ **Notification System**
+  - Clients notified when documents uploaded
+  - In-app notifications
+  - Document type, filename, and metadata
+- ✅ **Document Categories**
+  - 10 predefined categories with icons
+  - Status tracking (Active/Pending/Expired)
+  - Expiry date monitoring
+  - Document count per category
+- ✅ **Storage Organization**
+  - 4 Supabase Storage buckets
+  - Organized by client/entity folders
+  - Secure RLS policies
+- ✅ **Document Actions**
+  - Download documents
+  - View document details
+  - Status tracking
+  - Search and filter
+- ✅ **Full Documentation**
+  - `DOCUMENT_MANAGEMENT_GUIDE.md` (500+ lines)
+  - `DOCUMENT_ROUTING_IMPROVEMENTS.md` (comprehensive)
+  - `IMPLEMENTATION_CHECKLIST.md` (300+ items)
+  - Sample data scripts
 
 #### 🎨 Dark Mode Optimization (Oct 26, 2025)
 - ✅ Complete dark mode overhaul for Advanced Truck Management page
@@ -511,7 +627,49 @@ If upgrading from earlier versions:
   - Rate per km, total value
   - Routes and vehicle types
 
-#### 📤 Data Export
+#### � Document Management (`/documents`) ✅ NEW
+- ✅ **Comprehensive Document System**
+  - 10 document categories with icons and colors
+  - Category cards showing document count and expiring docs
+  - Search and filter documents
+  - Status tracking (Active/Pending/Expired)
+- ✅ **Document Categories**
+  - Contract documents
+  - Invoices
+  - Driver licenses
+  - Truck insurance
+  - Truck registration
+  - Compliance documents
+  - Maintenance records
+  - Inspection certificates
+  - Permits
+  - Miscellaneous
+- ✅ **Smart Upload System**
+  - Client selection for contracts, invoices, misc docs
+  - Entity selection (drivers/trucks) for relevant docs
+  - File validation (10MB, PDF/JPG/PNG)
+  - Document metadata (number, issue date, expiry date)
+  - Description and notes fields
+- ✅ **Client Routing & Notifications**
+  - Auto-route documents to specific clients
+  - Client email displayed in selector
+  - Real-time notification creation
+  - Success confirmation messages
+- ✅ **Document Actions**
+  - Download documents
+  - View document details
+  - Status badges (Active/Expiring/Expired)
+  - Entity information display
+- ✅ **Storage Integration**
+  - 4 Supabase Storage buckets
+  - Organized folder structure by client/entity
+  - Secure RLS policies for access control
+- ✅ **Dark Mode Support**
+  - Full CSS variables integration
+  - Smooth animations
+  - Responsive design
+
+#### �📤 Data Export
 - ✅ **CSV Export** (`/admin/export/shipments`)
   - Export shipments by date range
   - All shipment fields included
@@ -561,6 +719,7 @@ If upgrading from earlier versions:
   - User guide link
   - Contact info
   - Quick help buttons
+  - **Documents access** 📁 NEW
 - ✅ **Support Chat**
   - Same as admin chat
   - Connect with admin support
@@ -665,10 +824,12 @@ If upgrading from earlier versions:
 
 ### 💾 Database & Backend
 - ✅ **Supabase Setup**
-  - Tables: profiles, clients, contracts, shipments, trucks, drivers, telemetry, bookings, trips, maintenance_records, driver_performance, fuel_records, optimized_routes, user_settings, notification_preferences, system_config
+  - Tables: profiles, clients, contracts, shipments, trucks, drivers, telemetry, bookings, trips, maintenance_records, driver_performance, fuel_records, optimized_routes, user_settings, notification_preferences, system_config, **document_categories, invoices, driver_documents, truck_documents, contract_documents, document_audit_log** 📁 NEW
+  - **Storage Buckets**: invoices, driver-documents, truck-documents, contract-documents 📁 NEW
   - RLS policies for all tables
   - Admin helper function: `public.is_admin(uid)`
   - Indexes for performance
+  - **Document management functions**: check_expiring_documents(), update_expired_documents(), generate_invoice_number() 📁 NEW
 - ✅ **API Routes**
   - `/api/bookings/approve` - Approve booking and create shipment
   - `/api/bookings/reject` - Reject booking with reason
@@ -742,14 +903,6 @@ If upgrading from earlier versions:
   - OTP verification
   - Critical alerts
   - *Status:* Third-party integration pending (Twilio/AWS SNS)
-
-#### 📄 Document Management
-- ⏳ **Supabase Storage Integration**
-  - Contract document uploads
-  - Invoice PDFs
-  - Driver license scans
-  - Truck insurance documents
-  - *Status:* Schema ready, UI pending
 
 #### 🧮 Advanced Analytics
 - ⏳ **Custom Reports**
@@ -856,10 +1009,17 @@ The dev server runs on port 3000 when available.
 
 1) Create a project on Supabase and get the URL + anon key
 2) Apply schema: open Supabase SQL editor and run `supabase/schema.sql`
-3) Seed minimal data
+3) **Apply document management migration** 📁 NEW: Run `supabase/migrations/2025-10-26-document-management-system.sql` in SQL editor
+4) **Create storage buckets** 📁 NEW: In Supabase Dashboard → Storage, create 4 buckets:
+   - `invoices` (Private, 10MB limit)
+   - `driver-documents` (Private, 10MB limit)
+   - `truck-documents` (Private, 10MB limit)
+   - `contract-documents` (Private, 10MB limit)
+5) Seed minimal data
 - Insert a `clients` row
 - Create a user (Auth) → insert into `profiles` with id = auth user id, role = 'admin' or 'client', and optional client_id for clients
 - Optional: insert trucks, drivers; set `trucks.driver_id` for linking
+- Optional: Run `supabase/SAMPLE_DATA.sql` for test data
 
 Tables of interest (high-level)
 
@@ -871,12 +1031,19 @@ Tables of interest (high-level)
 - drivers(id, name, phone, license, ...)
 - telemetry(id, truck_id, ts, lat, lng, speed, status)
 - bookings(id, user_id, client_id, vehicle_type, source_city, destination_city, weight_mt, pickup_date, status)
+- **document_categories**(id, name, description, icon, color) 📁 NEW
+- **invoices**(id, invoice_number, client_id, shipment_id, document_path, status) 📁 NEW
+- **driver_documents**(id, driver_id, document_type, file_path, expiry_date, status) 📁 NEW
+- **truck_documents**(id, truck_id, document_type, file_path, expiry_date, status) 📁 NEW
+- **contract_documents**(id, contract_id, file_path, uploaded_by) 📁 NEW
+- **document_audit_log**(id, document_table, document_id, action, user_id) 📁 NEW
 
 RLS summary (admin highlights)
 
 - Profiles: self read/update/insert; admin read via public.is_admin()
 - Clients/Contracts/Shipments/Trucks/Telemetry: admin read; shipments admin insert
 - Bookings: client insert/select; admin read/update
+- **Documents** 📁 NEW: admin full access; clients read own via client_id
 - Drivers: admin read
 
 ## Core routes and workflows
@@ -1255,6 +1422,7 @@ graph TB
 │   ├── bookings/             # Re-export bookings
 │   ├── contracts/            # Re-export contracts
 │   ├── dashboard/            # Re-export dashboards
+│   ├── documents/            # 📁 NEW: Re-export documents
 │   ├── login/                # Re-export login
 │   ├── register/             # Re-export register
 │   └── settings/             # Re-export settings
@@ -1307,6 +1475,10 @@ graph TB
 │   │   ├── contracts/        # Contracts listing
 │   │   │   ├── page.tsx      # Active/Expired contracts
 │   │   │   └── contracts.css
+│   │   │
+│   │   ├── documents/        # 📁 NEW: Document management
+│   │   │   ├── page.tsx      # Document categories, upload, download
+│   │   │   └── documents.css # Document styling with dark mode
 │   │   │
 │   │   ├── dashboard/
 │   │   │   └── customer/     # Client dashboard
@@ -1430,11 +1602,13 @@ Key Features:
 - `/admin/manage-trucks` - Quick truck CRUD interface
 - `/admin/support` - Support chat with clients
 - `/admin/export/shipments` - CSV export API
+- `/documents` - Document management system 📁 NEW
 
 #### Client Routes (requires `profiles.role = 'client'`)
 - `/dashboard/customer` - Client dashboard with bookings, shipments, map, chat
 - `/bookings` - All bookings with search, filter, modal details
 - `/contracts` - Contracts list with filters
+- `/documents` - Access assigned documents 📁 NEW
 
 #### Shared Routes
 - `/settings` - User settings (profile, appearance, notifications)
@@ -1468,6 +1642,20 @@ Key Features:
 - **notification_preferences** - Notification channels (user_id, email_enabled, sms_enabled, push_enabled)
 - **system_config** - System-wide config (key, value JSONB)
 
+#### Document Management Tables 📁 NEW
+- **document_categories** - Document types (id, name, description, icon, color, requires_approval)
+- **invoices** - Invoice records (id, invoice_number, client_id, shipment_id, issue_date, due_date, subtotal, tax_amount, total_amount, paid_amount, status, document_path, line_items JSONB)
+- **driver_documents** - Driver docs (id, driver_id, document_type, document_number, file_name, file_path, file_size, file_type, issue_date, expiry_date, status, is_verified)
+- **truck_documents** - Truck docs (id, truck_id, document_type, document_number, file_name, file_path, file_size, file_type, issue_date, expiry_date, status, insurance_provider, insurance_policy_number, insurance_amount)
+- **contract_documents** - Contract docs (id, contract_id, file_name, file_path, file_size, file_type, document_type, uploaded_by)
+- **document_audit_log** - Audit trail (id, document_table, document_id, action, user_id, user_role, ip_address, metadata JSONB, created_at)
+
+#### Storage Buckets 📁 NEW
+- **invoices** - Invoice PDFs (private, 10MB limit, PDF/JPG/PNG)
+- **driver-documents** - Driver licenses and certificates (private, 10MB limit)
+- **truck-documents** - Truck insurance, registration, permits (private, 10MB limit)
+- **contract-documents** - Contract files and miscellaneous docs (private, 10MB limit)
+
 #### RLS Policies
 - **Admin Helper**: `public.is_admin(uid UUID)` returns `TRUE` if user's profile has role='admin'
 - **Profiles**: Self read/update/insert; admin read all
@@ -1477,6 +1665,12 @@ Key Features:
 - **Telemetry**: Admin write; all read (for map)
 - **Contracts**: Admin read/write; client read own
 - **Notifications**: Self read/write; admin can write to any user
+- **Documents** 📁 NEW: 
+  - **Invoices**: Admin full access; clients read own (via client_id)
+  - **Driver Documents**: Admin full access
+  - **Truck Documents**: Admin full access
+  - **Contract Documents**: Admin full access
+  - **Storage Buckets**: Admin upload; authorized users download based on ownership
 
 ### Real-time Subscriptions
 
@@ -1555,7 +1749,14 @@ const channel = supabase
   - [x] Professional HTML templates
   - [x] SMTP integration
 - [x] Settings page with user preferences (Oct 2025)
-- [ ] Document uploads with Supabase Storage
+- [x] **Document Management System** (Oct 26, 2025) ✅
+  - [x] Complete document upload/download system
+  - [x] Client-specific document routing
+  - [x] 10 document categories with icons
+  - [x] Automatic client notifications
+  - [x] Storage buckets with RLS policies
+  - [x] Document expiry tracking
+  - [x] Search and filter functionality
 - [ ] Advanced analytics reports with PDF export
 - [ ] ETA prediction with routing service integration
 
@@ -1610,6 +1811,10 @@ All documentation has been consolidated into the `/Documents` directory for easi
 - `TRIP-CONFIRMATION-SYSTEM.md` - Trip confirmation process
 - `DRIVER_SALARY_IMPLEMENTATION.md` - Driver salary management
 - `SETTINGS_DOCUMENTATION.md` - User settings and preferences
+- **`DOCUMENT_MANAGEMENT_GUIDE.md`** - Complete document management system 📁 NEW
+- **`DOCUMENT_ROUTING_IMPROVEMENTS.md`** - Client routing and notifications 📁 NEW
+- **`IMPLEMENTATION_CHECKLIST.md`** - 300+ verification items 📁 NEW
+- **`IMPLEMENTATION_SUMMARY.md`** - Quick implementation overview 📁 NEW
 
 #### ⚡ Feature Documentation
 - `CHAT_FEATURE_DOCUMENTATION.md` - Chat system architecture
@@ -1718,11 +1923,11 @@ All legacy documentation from the `docs/` directory has been merged into `Docume
 
 ### Current Limitations
 1. **ETA Calculation**: Route distance/time currently uses OSRM for display only. No traffic or real-time routing integration yet.
-2. **Document Uploads**: Schema supports document_url fields but Supabase Storage integration pending.
-3. **Driver UI**: Driver management exists in admin panel but no dedicated driver mobile app yet.
-4. **Payment Integration**: No payment gateway integrated; manual invoicing required.
-5. **Advanced Analytics**: Basic charts working; custom report builder and PDF export pending.
-6. **SMS Notifications**: Email system complete, but SMS integration pending (Twilio/AWS SNS).
+2. **Driver UI**: Driver management exists in admin panel but no dedicated driver mobile app yet.
+3. **Payment Integration**: No payment gateway integrated; manual invoicing required.
+4. **Advanced Analytics**: Basic charts working; custom report builder and PDF export pending.
+5. **SMS Notifications**: Email system complete, but SMS integration pending (Twilio/AWS SNS).
+6. **Document Auto-Expiry**: Manual expiry date tracking; no automatic email alerts for expiring documents yet.
 
 ### Known Bugs
 - None critical at this time
@@ -1731,6 +1936,7 @@ All legacy documentation from the `docs/` directory has been merged into `Docume
 - **Real-time Subscriptions**: Can impact performance with 100+ concurrent users. Consider throttling or batching updates for scale.
 - **Map Markers**: With 50+ trucks, map can slow down. Consider clustering markers.
 - **CSV Export**: Large exports (5000+ shipments) may timeout. Add pagination or background job.
+- **Document Uploads**: Large file uploads (>10MB) will fail. Consider chunked uploads for larger files.
 
 ---
 
@@ -1800,6 +2006,23 @@ All legacy documentation from the `docs/` directory has been merged into `Docume
 - [ ] Email links work correctly
 - [ ] Email formatting responsive on mobile
 
+### Document Management 📁 NEW
+- [ ] Admin can access documents page
+- [ ] View all document categories with counts
+- [ ] Select document category
+- [ ] Open upload modal
+- [ ] Select client for contract/invoice/misc docs
+- [ ] Select entity for driver/truck docs
+- [ ] Upload document (validate file type/size)
+- [ ] Client receives notification
+- [ ] Document appears in list
+- [ ] Download document
+- [ ] Search documents
+- [ ] Filter by status
+- [ ] View expiring documents badge
+- [ ] Dark mode styling
+- [ ] Client can access their documents
+
 ### UI/UX
 - [ ] Toggle dark/light mode
 - [ ] Responsive on mobile, tablet, desktop
@@ -1867,6 +2090,14 @@ All legacy documentation from the `docs/` directory has been merged into `Docume
 - For Server Components, import client components like Leaflet directly; avoid `next/dynamic({ ssr:false })` in RSC
 - Always validate user input on server-side API routes
 - Use Supabase RLS as primary security layer; never trust client-side checks alone
+- **Document Security** 📁 NEW:
+  - All storage buckets are private with RLS policies
+  - Only admins can upload documents
+  - Clients can only access their assigned documents
+  - File size limited to 10MB per document
+  - Only PDF, JPG, PNG file types allowed
+  - Document access logged in audit trail
+  - Storage paths use UUIDs to prevent enumeration attacks
 
 ---
 

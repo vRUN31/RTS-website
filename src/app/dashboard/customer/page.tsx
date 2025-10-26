@@ -1006,11 +1006,38 @@ export default function CustomerDashboardPage() {
                     <div style={{ 
                         width: '100%', 
                         display: 'grid', 
-                        gridTemplateColumns: 'repeat(3, 1fr)', 
+                        gridTemplateColumns: 'repeat(4, 1fr)', 
                         gap: '16px',
-                        maxWidth: '800px',
+                        maxWidth: '1000px',
                         margin: '0 auto'
                     }}>
+                        <a href="/documents" style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '10px', 
+                            padding: '20px 16px', 
+                            background: 'rgba(255, 77, 0, 0.05)', 
+                            borderRadius: '12px', 
+                            textDecoration: 'none', 
+                            color: 'var(--text)', 
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            fontWeight: 500,
+                            fontSize: '1rem',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                        }}
+                           onMouseEnter={(e) => {
+                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
+                               e.currentTarget.style.transform = 'translateY(-4px)';
+                               e.currentTarget.style.boxShadow = '0 8px 16px rgba(255, 77, 0, 0.2)';
+                           }}
+                           onMouseLeave={(e) => {
+                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)';
+                               e.currentTarget.style.transform = 'translateY(0)';
+                               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                           }}>
+                            📁 <span>Documents</span>
+                        </a>
                         <a href="/user-guide" style={{ 
                             display: 'flex', 
                             alignItems: 'center', 
