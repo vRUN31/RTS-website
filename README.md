@@ -292,34 +292,65 @@ erDiagram
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant L as Login Page
-    participant A as Auth Middleware
-    participant S as Supabase Auth
-    participant D as Database
-    participant P as Protected Page
+    participant LP as Login Page<br/>(Client Component)
+    participant SA as Supabase Auth
+    participant DB as PostgreSQL Database
+    participant PP as Protected Page<br/>(Server Component)
     
-    U->>L: Enter credentials
-    L->>S: signInWithPassword()
-    S->>D: Verify credentials
-    D->>S: User data
-    S->>L: Auth session + JWT
-    L->>D: Check profiles table
-    D->>L: role + client_id
+    Note over U,DB: 🔐 LOGIN FLOW
+    U->>LP: Enter credentials + select role
+    LP->>LP: Check admin email domain<br/>(NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS)
+    LP->>SA: signInWithPassword(email, password)
+    SA->>SA: Verify credentials
+    SA->>LP: Session + JWT (httpOnly cookie)
     
-    alt Admin Role
-        L->>P: Redirect to /admin
-    else Client Role
-        L->>P: Redirect to /dashboard/customer
+    LP->>DB: SELECT role FROM profiles<br/>WHERE id = user_id
+    
+    alt Profile exists
+        DB->>LP: Existing role + client_id
+        alt Admin role selected & allowed
+            LP->>DB: UPDATE profiles SET role='admin'
+            DB->>LP: Profile updated
+        end
+    else No profile
+        LP->>DB: INSERT profiles<br/>(role, email, client_id)
+        DB->>LP: Profile created
     end
     
-    U->>P: Access protected route
-    P->>A: Check auth
-    A->>S: Verify JWT
-    S->>A: Valid session
-    A->>D: Check RLS policies
-    D->>A: Authorized
-    A->>P: Render page
-    P->>U: Display content
+    LP->>LP: Determine redirect target
+    alt role = 'admin'
+        LP->>U: Redirect to /admin
+    else role = 'client'
+        LP->>U: Redirect to /dashboard/customer
+    end
+    
+    Note over U,PP: 🛡️ PROTECTED PAGE ACCESS
+    U->>PP: Navigate to protected route
+    PP->>PP: Create Supabase SSR client<br/>with cookies
+    PP->>SA: auth.getUser() via JWT cookie
+    SA->>PP: User object (if valid JWT)
+    
+    alt No user
+        PP->>U: redirect('/login')
+    else User authenticated
+        PP->>DB: SELECT role, client_id<br/>FROM profiles WHERE id = user_id
+        DB->>PP: role + client_id
+        
+        alt Wrong role for page
+            Note over PP: Client accessing /admin
+            PP->>U: redirect('/dashboard/customer')
+        else Correct role
+            PP->>DB: Fetch data (SELECT query)
+            Note over DB: RLS POLICY CHECK:<br/>auth.uid() = user_id<br/>AND role = 'admin' (if needed)
+            DB->>PP: Filtered data (RLS applied)
+            PP->>U: Render page with data
+        end
+    end
+    
+    Note over U,PP: 📊 REAL-TIME UPDATES
+    PP->>DB: Subscribe to realtime channel<br/>(shipments, notifications, etc.)
+    DB-->>PP: Push updates via WebSocket
+    PP-->>U: Update UI reactively
 ```
 
 ### Booking & Document Workflow
@@ -1859,6 +1890,7 @@ const channel = supabase
 All documentation has been consolidated into the `/Documents` directory for easier navigation and maintenance.
 
 #### 📖 Implementation Guides
+- **`AUTHENTICATION_FLOW_EXPLAINED.md`** - Complete auth & authorization documentation 🔐 NEW (v2.4)
 - `BOOKINGS_IMPLEMENTATION.md` - Bookings page features, testing, troubleshooting
 - `FLEET_SETUP_GUIDE.md` - Fleet management setup steps
 - `ROUTE_BOOKING_README.md` - Route booking with map integration
