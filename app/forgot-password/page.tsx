@@ -1,4 +1,0 @@
-export { default } from '../../src/app/forgot-password/page';
-
-
-

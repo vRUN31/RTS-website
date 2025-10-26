@@ -21,8 +21,15 @@
 ## 🎯 Project Status
 
 **Last Updated:** October 26, 2025  
-**Version:** 2.3  
+**Version:** 2.4  
 **Status:** ✅ **Production-Ready Core Features** | 🚧 **Advanced Features In Progress**
+
+### Latest Updates (v2.4)
+- ✅ **UI/UX Enhancements**: Removed redundant navigation elements from customer dashboard
+- ✅ **Document Center Redesign**: Simplified document access with clear call-to-action
+- ✅ **Help Resources Optimization**: Reduced from 4 to 3 buttons for cleaner interface
+- ✅ **Documentation Organization**: All .md files consolidated in `/Documents` folder
+- ✅ **Settings Page Review**: Verified responsive design and dark mode compatibility
 
 ---
 
@@ -84,100 +91,156 @@ graph TB
 ```mermaid
 erDiagram
     profiles ||--o{ bookings : creates
-    profiles ||--o{ shipments : tracks
     profiles }o--|| clients : belongs_to
     clients ||--o{ contracts : has
     clients ||--o{ shipments : owns
-    clients ||--o{ invoices : receives
-    clients ||--o{ notifications : receives
     contracts ||--o{ shipments : governs
-    contracts ||--o{ contract_documents : has
     trucks ||--o{ shipments : transports
     trucks ||--o{ telemetry : emits
-    trucks ||--o{ truck_documents : requires
     trucks }o--o| drivers : assigned_to
-    trucks ||--o{ trips : performs
-    trucks ||--o{ maintenance_records : requires
-    trucks ||--o{ fuel_records : consumes
-    drivers ||--o{ driver_performance : measured_by
-    drivers ||--o{ driver_documents : possesses
     bookings ||--o| shipments : converts_to
-    invoices ||--o| shipments : bills_for
+    notifications }o--|| profiles : notifies
+    dispatch_offers }o--|| shipments : offers_for
+    dispatch_offers }o--|| drivers : offered_to
     
     profiles {
-        uuid id PK
-        text role
+        uuid id PK "FK to auth.users"
+        text role "admin or client"
         text name
         text email
         uuid client_id FK
+        timestamptz created_at
     }
     
     clients {
         uuid id PK
-        text name
-        text contact
+        text name "NOT NULL"
         text email
+        text phone
+        text company
+        jsonb contacts
+        text gst
+        text billing_terms
+        timestamptz created_at
     }
     
     contracts {
         uuid id PK
         uuid client_id FK
-        date start_at
-        date end_at
+        date start_at "NOT NULL"
+        date end_at "NOT NULL"
+        jsonb lanes
+        jsonb base_rates
+        jsonb documents
+        timestamptz created_at
     }
     
     bookings {
         uuid id PK
-        uuid user_id FK
-        text status
+        uuid user_id FK "FK to auth.users"
+        uuid client_id FK
         text vehicle_type
+        text source_city "NOT NULL"
+        text destination_city "NOT NULL"
+        text material
         numeric weight_mt
+        date pickup_date
+        text notes
+        text status "default submitted"
+        timestamptz created_at
     }
     
     shipments {
         uuid id PK
         uuid client_id FK
+        uuid contract_id FK
         uuid truck_id FK
         text origin
         text destination
+        numeric distance_km
+        numeric weight_mt
         text status
+        timestamptz eta
+        timestamptz delivered_at
         numeric cost
+        timestamptz created_at
     }
     
     trucks {
         uuid id PK
         text plate
+        text device_id
         text status
+        text location
+        float last_lat
+        float last_lng
+        numeric speed
+        timestamptz last_updated
         uuid driver_id FK
-        text vehicle_type
+        timestamptz created_at
     }
     
     drivers {
         uuid id PK
-        text name
+        text name "NOT NULL"
         text phone
-        text license
+        text license_no
+        date license_expiry
+        int experience_years
+        text address
+        text emergency_contact
+        timestamptz created_at
     }
     
     telemetry {
-        uuid id PK
+        bigint id PK "auto-increment"
         uuid truck_id FK
-        timestamp ts
-        numeric lat
-        numeric lng
+        timestamptz ts "NOT NULL"
+        float lat
+        float lng
         numeric speed
+        text status
     }
     
-    document_categories {
+    notifications {
         uuid id PK
-        text name UK
-        text description
-        text icon
-        text color
+        uuid user_id "NOT NULL"
+        text type "dispatch, system, reminder"
+        text channel "inapp, sms, email, whatsapp"
+        jsonb payload
+        text status "queued, sent, failed, read"
+        timestamptz created_at
+        timestamptz read_at
     }
     
-    invoices {
+    dispatch_offers {
         uuid id PK
+        uuid shipment_id FK
+        uuid driver_id "NOT NULL"
+        int rank "NOT NULL"
+        text status "pending, accepted, rejected, expired"
+        timestamptz expires_at
+        timestamptz created_at
+    }
+```
+
+**Key Tables:**
+- **profiles**: User accounts with role-based access (admin/client)
+- **clients**: Client companies with billing information
+- **contracts**: Time-bound agreements between clients and RTS
+- **bookings**: Client intake requests (before approval)
+- **shipments**: Approved bookings converted to active shipments
+- **trucks**: Fleet vehicles with real-time location tracking
+- **drivers**: Driver information and credentials
+- **telemetry**: Real-time GPS data from trucks
+- **notifications**: Multi-channel notification system
+- **dispatch_offers**: Driver assignment offers with ranking
+
+**Security:**
+- All tables have Row Level Security (RLS) enabled
+- Admin access controlled via `public.is_admin(uuid)` function
+- Clients can only see their own data (via client_id)
+- Policies enforce data isolation between tenants
         text invoice_number UK
         uuid client_id FK
         uuid shipment_id FK
@@ -715,11 +778,18 @@ If upgrading from earlier versions:
 - ✅ **FAQ Section**
   - Expandable details
   - Common questions answered
+- ✅ **Document Center**
+  - Clear, prominent section
+  - "View All Documents" call-to-action
+  - Direct link to `/documents` page
+  - No shipment dependency
+  - Works for all clients
+  - Gradient button with hover effects
 - ✅ **Help Resources**
   - User guide link
-  - Contact info
-  - Quick help buttons
-  - **Documents access** 📁 NEW
+  - Contact support button
+  - Email support
+  - Clean 3-column grid layout
 - ✅ **Support Chat**
   - Same as admin chat
   - Connect with admin support
@@ -1413,22 +1483,8 @@ graph TB
 
 ```
 /RTS-website
-├── app/                       # Top-level route shims (re-export from src/app)
-│   ├── page.tsx              # Home redirect
-│   ├── layout.tsx            # Root layout
-│   ├── admin/                # Admin routes
-│   │   ├── page.tsx          # Re-export admin dashboard
-│   │   └── analytics/        # Re-export analytics
-│   ├── bookings/             # Re-export bookings
-│   ├── contracts/            # Re-export contracts
-│   ├── dashboard/            # Re-export dashboards
-│   ├── documents/            # 📁 NEW: Re-export documents
-│   ├── login/                # Re-export login
-│   ├── register/             # Re-export register
-│   └── settings/             # Re-export settings
-│
-├── src/                      # Main application source
-│   ├── app/                  # Canonical Next.js App Router
+├── src/                      # Main application source (canonical)
+│   ├── app/                  # Next.js App Router (all routes run from here)
 │   │   ├── _*.client.tsx     # Global client components (effects, nav, topbar)
 │   │   ├── globals.css       # Global styles + CSS variables for theming
 │   │   ├── layout.tsx        # Root layout with Leaflet CSS
@@ -1578,7 +1634,7 @@ graph TB
 Key Features:
 - ✅ Server Components (SSR) by default for better performance
 - ✅ Client Components (.client.tsx) only where needed (state, effects)
-- ✅ Top-level app/ shims for route stability
+- ✅ All routes run from src/app/ (Next.js natively supports src/ directory)
 - ✅ Centralized styles in src/app/globals.css
 - ✅ Type-safe with TypeScript
 - ✅ RLS-protected Supabase backend
@@ -1845,6 +1901,7 @@ All documentation has been consolidated into the `/Documents` directory for easi
 - `MANAGE_TRUCKS_ENHANCEMENTS.md` - Truck management enhancements
 
 #### 🎨 UI/UX Documentation
+- `CUSTOMER_DASHBOARD_UX_IMPROVEMENTS.md` - Dashboard UX enhancements (v2.4) 🆕
 - `DARK_MODE_BEFORE_AFTER.md` - Dark mode visual comparison
 - `DARK_MODE_ENHANCEMENTS.md` - Dark mode features
 - `DARK_MODE_OPTIMIZATION.md` - Dark mode optimization

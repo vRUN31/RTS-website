@@ -441,10 +441,6 @@ export default function CustomerDashboardPage() {
     return (
         <>
             <main className="dashboard-container">
-                <div className="page-header-back">
-                    <BackButton label="Back to Home" fallbackUrl="/" />
-                </div>
-
                 <div className={`dashboard-header mb-18 ${styles.gradientText}`}>Welcome to RAJMOHAN TRANSPORT SERVICES</div>
 
                 {/* KPI Row - Hidden for guest users */}
@@ -800,112 +796,52 @@ export default function CustomerDashboardPage() {
                             {guestMode ? (
                                 <div className={styles.emptyState}>
                                     <h3>🔒 Login Required</h3>
-                                    <p>Please login to access shipment documents</p>
+                                    <p>Please login to access your documents</p>
                                     <div className="row-gap-12" style={{display:'flex',gap:12,marginTop:16,justifyContent:'center'}}>
                                         <a className={`btn-dark ${styles.enhancedButton}`} href="/login">Login</a>
                                         <a className={`btn-dark ${styles.enhancedButton}`} href="/register">Sign Up</a>
                                     </div>
                                 </div>
                             ) : (
-                                <>
+                                <div style={{ textAlign: 'center', padding: '20px 0' }}>
                                     <p style={{ 
-                                        fontSize: '0.875rem', 
+                                        fontSize: '0.938rem', 
                                         color: 'var(--text-secondary)', 
-                                        marginBottom: '16px',
-                                        textAlign: 'center' 
+                                        marginBottom: '20px',
+                                        lineHeight: '1.6'
                                     }}>
-                                        Access shipment documents by selecting a shipment below
+                                        View, manage, and download all your documents including invoices, contracts, shipment documents, and more.
                                     </p>
-                                    
-                                    {loading ? (
-                                        <div style={{ padding: '20px', textAlign: 'center' }}>
-                                            <div className={styles.loadingSpinner} style={{ margin: '0 auto' }}></div>
-                                        </div>
-                                    ) : rows.length === 0 ? (
-                                        <div className={styles.emptyState}>
-                                            <p>No shipments found. Documents will appear here once you have active shipments.</p>
-                                        </div>
-                                    ) : (
-                                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {rows.slice(0, 5).map((shipment) => {
-                                                const isDelivered = shipment.status?.toLowerCase() === 'delivered';
-                                                const docsAvailable = isDelivered ? 4 : 3; // All 4 docs if delivered, else 3
-                                                
-                                                return (
-                                                    <button
-                                                        key={shipment.id}
-                                                        onClick={() => {
-                                                            setSelectedShipmentForDocs(shipment.id);
-                                                            setShowDocuments(true);
-                                                        }}
-                                                        style={{
-                                                            width: '100%',
-                                                            padding: '12px',
-                                                            background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-                                                            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-                                                            borderRadius: '8px',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s',
-                                                            textAlign: 'left',
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 77, 0, 0.05)';
-                                                            e.currentTarget.style.borderColor = 'var(--brand)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.background = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)';
-                                                            e.currentTarget.style.borderColor = isDarkMode ? '#334155' : '#e2e8f0';
-                                                        }}
-                                                    >
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ 
-                                                                fontSize: '0.813rem', 
-                                                                fontWeight: 600,
-                                                                color: 'var(--text)',
-                                                                marginBottom: '4px',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '8px'
-                                                            }}>
-                                                                {shipment.origin} → {shipment.destination}
-                                                                <span style={{
-                                                                    fontSize: '0.688rem',
-                                                                    padding: '2px 6px',
-                                                                    borderRadius: '4px',
-                                                                    background: isDelivered ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                                                                    color: isDelivered ? '#10b981' : '#3b82f6',
-                                                                    fontWeight: 700
-                                                                }}>
-                                                                    {docsAvailable}/4 docs
-                                                                </span>
-                                                            </div>
-                                                            <div style={{ 
-                                                                fontSize: '0.75rem', 
-                                                                color: 'var(--text-secondary)' 
-                                                            }}>
-                                                                ID: {String(shipment.id).slice(0, 8)}... • {shipment.status}
-                                                            </div>
-                                                        </div>
-                                                        <span style={{ color: 'var(--brand)', fontSize: '1.25rem' }}>→</span>
-                                                    </button>
-                                                );
-                                            })}
-                                            {rows.length > 5 && (
-                                                <div style={{ 
-                                                    textAlign: 'center', 
-                                                    padding: '8px 0',
-                                                    fontSize: '0.75rem',
-                                                    color: 'var(--text-secondary)'
-                                                }}>
-                                                    Showing 5 of {rows.length} shipments
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </>
+                                    <a 
+                                        href="/documents" 
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            padding: '14px 28px',
+                                            background: 'linear-gradient(135deg, var(--brand) 0%, var(--brand-light, #ff6b2c) 100%)',
+                                            color: 'white',
+                                            borderRadius: '10px',
+                                            textDecoration: 'none',
+                                            fontWeight: 600,
+                                            fontSize: '1rem',
+                                            transition: 'all 0.3s ease',
+                                            boxShadow: '0 4px 12px rgba(255, 77, 0, 0.3)',
+                                            border: 'none',
+                                            cursor: 'pointer'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 77, 0, 0.4)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 77, 0, 0.3)';
+                                        }}
+                                    >
+                                        📁 <span>View All Documents</span> →
+                                    </a>
+                                </div>
                             )}
                         </div>
                     <div className={`panel ${styles.panelCenter}`} id="aboutus">
@@ -1006,38 +942,11 @@ export default function CustomerDashboardPage() {
                     <div style={{ 
                         width: '100%', 
                         display: 'grid', 
-                        gridTemplateColumns: 'repeat(4, 1fr)', 
+                        gridTemplateColumns: 'repeat(3, 1fr)', 
                         gap: '16px',
-                        maxWidth: '1000px',
+                        maxWidth: '900px',
                         margin: '0 auto'
                     }}>
-                        <a href="/documents" style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            gap: '10px', 
-                            padding: '20px 16px', 
-                            background: 'rgba(255, 77, 0, 0.05)', 
-                            borderRadius: '12px', 
-                            textDecoration: 'none', 
-                            color: 'var(--text)', 
-                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                            fontWeight: 500,
-                            fontSize: '1rem',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
-                        }}
-                           onMouseEnter={(e) => {
-                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.1)';
-                               e.currentTarget.style.transform = 'translateY(-4px)';
-                               e.currentTarget.style.boxShadow = '0 8px 16px rgba(255, 77, 0, 0.2)';
-                           }}
-                           onMouseLeave={(e) => {
-                               e.currentTarget.style.background = 'rgba(255, 77, 0, 0.05)';
-                               e.currentTarget.style.transform = 'translateY(0)';
-                               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                           }}>
-                            📁 <span>Documents</span>
-                        </a>
                         <a href="/user-guide" style={{ 
                             display: 'flex', 
                             alignItems: 'center', 

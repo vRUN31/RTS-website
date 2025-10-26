@@ -1,6 +1,6 @@
 # AI agent instructions for RTS-website
 
-This repo contains a Next.js App Router app (TypeScript) under `src/app` and legacy static HTML prototypes under `src/Dasboard` and `src/login and reg` (kept for reference). The canonical app is the Next.js one. We integrate Supabase for authentication, database (tables, storage), and realtime.
+This repo contains a Next.js App Router app (TypeScript) under `src/app` and legacy static HTML prototypes under `src/Dasboard` and `src/login and reg` (kept for reference). The canonical app is the Next.js one in `src/app`. We integrate Supabase for authentication, database (tables, storage), and realtime.
 
 ## Big picture
 - Entry: `src/login and reg/home.html` (landing with Sign Up, Login, Guest).
@@ -11,7 +11,7 @@ This repo contains a Next.js App Router app (TypeScript) under `src/app` and leg
 ## Run & debug
 - Use `npm run dev` (Turbopack enabled) to run Next.js locally.
 - Env vars in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-- Top-level `app/*` shims re-export from `src/app/*` to keep routes stable.
+- All routes are in `src/app/*` - Next.js natively supports the src/ directory structure.
 
 ### Supabase quickstart
 - Use the shared helpers: `@/utils/supabase/client` for client components and `@/utils/supabase/server` for SSR components. Do not hardcode keys in pages.
@@ -22,6 +22,7 @@ This repo contains a Next.js App Router app (TypeScript) under `src/app` and leg
 - Styling is centralized in `src/app/globals.css` (brand `#ff4d00`, backgrounds `#dedede`/`#f6f6f6`, fonts Cinzel/Playfair Display). Avoid inline styles.
 - Client pages use a small `Effects` component for page transitions.
 - Preserve `?guest=true` across routes in customer flows when applicable.
+- **Documentation**: All new markdown documentation files (except root `README.md`) must be placed in the `/Documents` directory for centralized documentation management.
 
 ### Supabase conventions
 - Auth: use `supabase.auth.signInWithPassword` and then read or bootstrap `profiles.role` to route admin → `/admin`, client → `/dashboard/customer`. Admin role requires `email` domain in `NEXT_PUBLIC_ADMIN_EMAIL_DOMAINS`.
@@ -70,10 +71,10 @@ Supabase-specific
 - Admin dashboard → embeds `LeafletMap.client` showing full fleet, KPI cards, recent shipments, date/grain filters, quick actions (create contract, CSV export), and multiple analytics charts rendered via Chart.js.
 
 ## Pitfalls
-- Keep alias imports stable (`@/*` → repo root). Top-level `app/*` must only re-export from `src/app/*`.
+- Keep alias imports stable (`@/*` → src directory). All application routes are in `src/app/*`.
 - Avoid inline secrets; never commit service_role.
- - Leaflet is client-only: include CSS in `src/app/layout.tsx`. In Server Components, do not use `next/dynamic({ ssr:false })`; import the client component directly since it has `"use client"`.
- - When fetching client-visible trucks for the map, avoid implicit joins unless FKs and RLS are configured accordingly. Prefer a two-step fetch: (1) `shipments` → truck_ids (not null), (2) `trucks` → where id in truck_ids.
+- Leaflet is client-only: include CSS in `src/app/layout.tsx`. In Server Components, do not use `next/dynamic({ ssr:false })`; import the client component directly since it has `"use client"`.
+- When fetching client-visible trucks for the map, avoid implicit joins unless FKs and RLS are configured accordingly. Prefer a two-step fetch: (1) `shipments` → truck_ids (not null), (2) `trucks` → where id in truck_ids.
 
 Troubleshooting map errors
 
