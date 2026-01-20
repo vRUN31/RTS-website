@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import AutoAssignButton from '@/src/components/booking/AutoAssignButton.client';
 // We show the modal from the page-level container via a custom event to avoid rendering inside <tbody>.
 
 export default function BookingActionRow({ booking, displayName }: { booking: any, displayName?: string }) {
@@ -82,7 +83,13 @@ export default function BookingActionRow({ booking, displayName }: { booking: an
             <td>{booking.material ?? '—'}</td>
             <td>{booking.notes ?? '—'}</td>
             <td>{booking.created_at?.slice(0,10) ?? '—'}</td>
-            <td className="action-cell">
+            <td className="action-cell" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <AutoAssignButton 
+                    bookingId={booking.id}
+                    size="small"
+                    onSuccess={() => window.location.reload()}
+                    onError={(err) => alert(`Auto-assign failed: ${err}`)}
+                />
                 <button className="btn-dark" onClick={() => {
                     const ev = new CustomEvent('open-assign-truck-modal', { detail: { bookingId: booking.id } });
                     window.dispatchEvent(ev);

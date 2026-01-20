@@ -399,7 +399,7 @@ export default function DocumentsPage() {
                 setEntities(data || []);
             } else if (categoryName === 'truck_insurance' || categoryName === 'truck_registration') {
                 const { data } = await supabase.from('trucks').select('id, plate as name').order('plate');
-                setEntities(data || []);
+                setEntities(    );
             } else if (categoryName === 'contract') {
                 const { data } = await supabase
                     .from('contracts')
