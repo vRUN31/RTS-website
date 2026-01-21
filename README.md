@@ -1,6 +1,9 @@
-# Rajmohan Transport Services (RTS) 🚛
+<div align="center">
 
-> **Enterprise-grade transportation management system** built with Next.js 15, TypeScript, and Supabase. Provides role-based workflows, real-time tracking, analytics, and comprehensive fleet management.
+# Rajmohan Transport Services (RTS) 🚛
+### **Enterprise-grade transportation management system** built with Next.js 15, TypeScript, and Supabase. Provides role-based workflows, real-time tracking, analytics, and comprehensive fleet management.
+
+</div>
 
 ---
 
