@@ -8,12 +8,12 @@ node_modules/
 .vscode/
 
 # Github folder
-# .github/
+.github/
 
 # prompt.md
 
 #Cursor rules
-#.cursor
+.cursor
 
 # Next js folder
 .next/
